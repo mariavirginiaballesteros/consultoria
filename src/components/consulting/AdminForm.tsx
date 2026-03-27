@@ -12,6 +12,7 @@ interface AdminFormProps {
 }
 
 export function AdminForm({ onAdd }: AdminFormProps) {
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [type, setType] = useState<ActivityType>('reunion');
   const [area, setArea] = useState(AREAS[0]);
   const [hours, setHours] = useState("1");
@@ -24,8 +25,13 @@ export function AdminForm({ onAdd }: AdminFormProps) {
       showError("Por favor, describe el impacto");
       return;
     }
+    if (!date) {
+      showError("Por favor, selecciona una fecha");
+      return;
+    }
 
     onAdd({
+      date,
       type,
       area,
       hours: parseFloat(hours) || 0,
@@ -40,6 +46,7 @@ export function AdminForm({ onAdd }: AdminFormProps) {
     setImpact("");
     setNotes("");
     setOpportunity(false);
+    setDate(new Date().toISOString().split('T')[0]);
     showSuccess("Actividad registrada con éxito");
   };
 
@@ -48,7 +55,11 @@ export function AdminForm({ onAdd }: AdminFormProps) {
   return (
     <Card className="p-5 mb-8 shadow-sm">
       <h2 className="text-sm font-semibold mb-4 text-slate-900">Registrar actividad</h2>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Fecha</Label>
+          <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
+        </div>
         <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground">Tipo</Label>
           <select className={selectClass} value={type} onChange={e => setType(e.target.value as ActivityType)}>

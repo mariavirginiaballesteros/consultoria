@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Download, AlertCircle } from "lucide-react";
+import { Download, AlertCircle, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { INITIAL_RECORDS, ActivityRecord, TYPE_LABELS } from "@/lib/consulting-data";
 import { MetricsCards } from "@/components/consulting/MetricsCards";
 import { AdminForm } from "@/components/consulting/AdminForm";
@@ -11,12 +12,13 @@ import { showSuccess } from "@/utils/toast";
 export default function Index() {
   const [view, setView] = useState<'admin' | 'cliente'>('admin');
   const [records, setRecords] = useState<ActivityRecord[]>(INITIAL_RECORDS);
+  const [clientName, setClientName] = useState("Consultoría Bancaria");
+  const [isEditingName, setIsEditingName] = useState(false);
 
-  const handleAddRecord = (data: Omit<ActivityRecord, 'id' | 'date'>) => {
+  const handleAddRecord = (data: Omit<ActivityRecord, 'id'>) => {
     const newRecord: ActivityRecord = {
       ...data,
       id: records.length > 0 ? Math.max(...records.map(r => r.id)) + 1 : 1,
-      date: new Date().toISOString().split('T')[0],
     };
     setRecords([...records, newRecord]);
   };
@@ -38,7 +40,7 @@ export default function Index() {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `reporte-consultoria-${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `reporte-${clientName.toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
   };
 
@@ -54,10 +56,32 @@ export default function Index() {
         
         {/* Header */}
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-5 md:p-6 rounded-lg shadow-sm border border-slate-200 mb-8 gap-4 transition-all">
-          <h1 className="text-xl md:text-2xl font-semibold text-blue-600 flex items-center gap-2">
-            🏦 Consultoría Bancaria - {formattedDate}
-          </h1>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+          
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            <span className="text-xl md:text-2xl font-semibold text-blue-600">🏦</span>
+            {isEditingName ? (
+              <Input
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+                onBlur={() => setIsEditingName(false)}
+                onKeyDown={(e) => e.key === 'Enter' && setIsEditingName(false)}
+                className="text-lg md:text-xl font-semibold text-blue-600 h-9 w-[200px] md:w-[250px] border-blue-200 focus-visible:ring-blue-500 px-2"
+                autoFocus
+              />
+            ) : (
+              <h1 
+                className="text-xl md:text-2xl font-semibold text-blue-600 flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity group"
+                onClick={() => setIsEditingName(true)}
+                title="Click para editar nombre"
+              >
+                {clientName}
+                <Pencil className="h-4 w-4 text-slate-300 group-hover:text-blue-500 transition-colors" />
+              </h1>
+            )}
+            <span className="text-xl md:text-2xl font-semibold text-blue-600 hidden md:inline-block">- {formattedDate}</span>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto mt-2 md:mt-0">
             <div className="flex bg-slate-100 p-1 rounded-md">
               <button
                 onClick={() => setView('admin')}
