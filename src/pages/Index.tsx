@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Download, AlertCircle, Pencil } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Download, AlertCircle, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { INITIAL_RECORDS, ActivityRecord, TYPE_LABELS } from "@/lib/consulting-data";
@@ -11,9 +11,35 @@ import { showSuccess } from "@/utils/toast";
 
 export default function Index() {
   const [view, setView] = useState<'admin' | 'cliente'>('admin');
-  const [records, setRecords] = useState<ActivityRecord[]>(INITIAL_RECORDS);
-  const [clientName, setClientName] = useState("Consultoría Bancaria");
+  
+  // Cargar datos de localStorage o usar los iniciales
+  const [records, setRecords] = useState<ActivityRecord[]>(() => {
+    const savedRecords = localStorage.getItem("consulting-records");
+    if (savedRecords) {
+      try {
+        return JSON.parse(savedRecords);
+      } catch (e) {
+        console.error("Error parsing saved records", e);
+      }
+    }
+    return INITIAL_RECORDS;
+  });
+
+  const [clientName, setClientName] = useState(() => {
+    return localStorage.getItem("consulting-client-name") || "Consultoría Bancaria";
+  });
+  
   const [isEditingName, setIsEditingName] = useState(false);
+
+  // Guardar en localStorage cada vez que cambian los registros
+  useEffect(() => {
+    localStorage.setItem("consulting-records", JSON.stringify(records));
+  }, [records]);
+
+  // Guardar en localStorage cada vez que cambia el nombre del cliente
+  useEffect(() => {
+    localStorage.setItem("consulting-client-name", clientName);
+  }, [clientName]);
 
   const handleAddRecord = (data: Omit<ActivityRecord, 'id'>) => {
     const newRecord: ActivityRecord = {
@@ -24,8 +50,18 @@ export default function Index() {
   };
 
   const handleDeleteRecord = (id: number) => {
-    setRecords(records.filter(r => r.id !== id));
-    showSuccess("Actividad eliminada");
+    if (window.confirm("¿Estás seguro de que deseas eliminar esta actividad?")) {
+      setRecords(records.filter(r => r.id !== id));
+      showSuccess("Actividad eliminada");
+    }
+  };
+
+  const handleClearAllData = () => {
+    if (window.confirm("🚨 ¿ESTÁS SEGURO? Esto borrará TODOS los registros permanentemente y reseteará el nombre del cliente. No se puede deshacer.")) {
+      setRecords([]);
+      setClientName("Consultoría Bancaria");
+      showSuccess("Todos los datos han sido borrados");
+    }
   };
 
   const handleExportCSV = () => {
@@ -99,6 +135,11 @@ export default function Index() {
             <Button onClick={handleExportCSV} variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50 h-9">
               📊 Exportar CSV
             </Button>
+            {view === 'admin' && (
+              <Button onClick={handleClearAllData} variant="ghost" className="text-red-500 hover:text-red-700 hover:bg-red-50 h-9 px-2">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         </header>
 
