@@ -2,16 +2,17 @@ import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Trash2, Check, Users, Zap, FileText, CheckCircle2 } from "lucide-react";
+import { Trash2, Pencil, Check, Users, Zap, FileText, CheckCircle2 } from "lucide-react";
 import { ActivityRecord } from "@/lib/consulting-data";
 
 interface AdminTableProps {
   records: ActivityRecord[];
+  onEdit: (record: ActivityRecord) => void;
   onDelete: (ids: string[]) => void;
   typeLabels: Record<string, string>;
 }
 
-export function AdminTable({ records, onDelete, typeLabels }: AdminTableProps) {
+export function AdminTable({ records, onEdit, onDelete, typeLabels }: AdminTableProps) {
   const [selected, setSelected] = useState<string[]>([]);
 
   const getTypeIcon = (type: string) => {
@@ -104,9 +105,14 @@ export function AdminTable({ records, onDelete, typeLabels }: AdminTableProps) {
                   {r.opportunity && <Check className="h-5 w-5 mx-auto text-[#E32462]" strokeWidth={3} />}
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-[#E32462] hover:bg-[#E32462]/10" onClick={() => handleSingleDelete(r.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <div className="flex justify-end items-center gap-1">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-[#62BAD3] hover:bg-[#62BAD3]/10" onClick={() => onEdit(r)} title="Editar actividad">
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-[#E32462] hover:bg-[#E32462]/10" onClick={() => handleSingleDelete(r.id)} title="Eliminar">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))

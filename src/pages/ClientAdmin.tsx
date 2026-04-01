@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { MetricsCards } from "@/components/consulting/MetricsCards";
 import { AdminForm } from "@/components/consulting/AdminForm";
 import { AdminTable } from "@/components/consulting/AdminTable";
+import { EditActivityDialog } from "@/components/consulting/EditActivityDialog";
 import { showSuccess, showError } from "@/utils/toast";
 import { ActivityRecord, MONTHLY_BUDGET, AREAS, DEFAULT_TYPES, getPeriodInfo } from "@/lib/consulting-data";
 import { JengibreFooter } from "@/components/JengibreFooter";
@@ -19,6 +20,7 @@ export default function ClientAdmin() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [selectedPeriodId, setSelectedPeriodId] = useState<string>("");
+  const [editingRecord, setEditingRecord] = useState<ActivityRecord | null>(null);
 
   const { data: client, isLoading: clientLoading } = useQuery({
     queryKey: ['client', clientId],
@@ -59,6 +61,25 @@ export default function ClientAdmin() {
       if (recordPeriod.id !== selectedPeriodId) setSelectedPeriodId(recordPeriod.id);
     },
     onError: () => showError("Error al guardar la actividad")
+  });
+
+  const updateRecord = useMutation({
+    mutationFn: async (updatedRecord: ActivityRecord) => {
+      // Extraemos solo los campos permitidos para actualizar
+      const { id, client_id, created_at, ...updateData } = updatedRecord;
+      const { data, error } = await supabase.from('activities').update(updateData).eq('id', id).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['activities', clientId] });
+      setEditingRecord(null);
+      showSuccess("Actividad actualizada correctamente");
+      
+      const recordPeriod = getPeriodInfo(data.date, clientStartDay);
+      if (recordPeriod.id !== selectedPeriodId) setSelectedPeriodId(recordPeriod.id);
+    },
+    onError: () => showError("Error al actualizar la actividad")
   });
 
   const bulkDelete = useMutation({
@@ -245,7 +266,13 @@ export default function ClientAdmin() {
 
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
           <AdminForm onAdd={(data) => addRecord.mutate(data)} areas={clientAreas} activityTypes={clientTypes} />
-          <AdminTable records={filteredRecords} onDelete={(ids) => bulkDelete.mutate(ids)} typeLabels={typeLabelsMap} />
+          
+          <AdminTable 
+            records={filteredRecords} 
+            onEdit={(record) => setEditingRecord(record)}
+            onDelete={(ids) => bulkDelete.mutate(ids)} 
+            typeLabels={typeLabelsMap} 
+          />
 
           {opportunities.length > 0 && (
             <div className="bg-white border-2 border-[#E32462]/30 rounded-xl p-6 mb-8 shadow-sm relative overflow-hidden">
@@ -265,6 +292,15 @@ export default function ClientAdmin() {
           )}
         </div>
       </div>
+      
+      <EditActivityDialog 
+        record={editingRecord}
+        isOpen={!!editingRecord}
+        onClose={() => setEditingRecord(null)}
+        onSave={(data) => updateRecord.mutate(data)}
+        areas={clientAreas}
+        activityTypes={clientTypes}
+      />
       
       <JengibreFooter />
     </div>
