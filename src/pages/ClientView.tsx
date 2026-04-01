@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MetricsCards } from "@/components/consulting/MetricsCards";
 import { ClientOverview } from "@/components/consulting/ClientOverview";
 import { ActivityRecord, MONTHLY_BUDGET, DEFAULT_TYPES, getPeriodInfo } from "@/lib/consulting-data";
-import { Loader2, FileDown, CalendarDays } from "lucide-react";
+import { Loader2, FileDown, CalendarDays, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { JengibreFooter } from "@/components/JengibreFooter";
 import { showSuccess, showError } from "@/utils/toast";
