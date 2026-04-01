@@ -47,7 +47,6 @@ export default function ClientAdmin() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['activities', clientId] });
-      // Si la actividad añadida es de un mes diferente al seleccionado, cambiamos la vista a ese mes
       const recordMonth = data.date.slice(0, 7);
       if (recordMonth !== selectedMonth) setSelectedMonth(recordMonth);
     },
@@ -65,7 +64,6 @@ export default function ClientAdmin() {
     }
   });
 
-  // Filtrado de meses
   const uniqueMonths = useMemo(() => {
     const months = new Set(allRecords.map(r => r.date.slice(0, 7)));
     months.add(currentYYYYMM);
@@ -82,6 +80,8 @@ export default function ClientAdmin() {
     const monthName = date.toLocaleString('es-ES', { month: 'long' });
     return `${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${year}`;
   };
+
+  const clientTypes = client?.activity_types ?? DEFAULT_TYPES;
 
   const handleExportCSV = () => {
     const typeLabelsMap = clientTypes.reduce((acc: any, t: any) => ({...acc, [t.value]: t.label}), {});
@@ -102,41 +102,66 @@ export default function ClientAdmin() {
 
   const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !client) return;
+
+    // Mapa inverso para encontrar el 'value' a partir del 'label' exportado
+    const reverseTypeMap = clientTypes.reduce((acc: any, t: any) => {
+      acc[t.label.toLowerCase().trim()] = t.value;
+      return acc;
+    }, {});
 
     const reader = new FileReader();
     reader.onload = async (event) => {
       const text = event.target?.result as string;
       if (!text) return;
 
-      const lines = text.split('\n');
+      // Dividir líneas soportando el formato de Windows (\r\n) y Mac/Linux (\n)
+      const lines = text.split(/\r?\n/);
       const newRecords = [];
 
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim();
         if (!line) continue;
+        
         const cols = [];
         let insideQuote = false;
         let currentStr = "";
+        
         for (let j = 0; j < line.length; j++) {
-          if (line[j] === '"') insideQuote = !insideQuote;
-          else if (line[j] === ',' && !insideQuote) { cols.push(currentStr); currentStr = ""; }
-          else currentStr += line[j];
+          if (line[j] === '"') {
+            insideQuote = !insideQuote;
+          } else if (line[j] === ',' && !insideQuote) {
+            cols.push(currentStr.trim());
+            currentStr = "";
+          } else {
+            currentStr += line[j];
+          }
         }
-        cols.push(currentStr);
+        cols.push(currentStr.trim());
 
+        // Aseguramos que la fila tenga fecha y al menos 4 columnas
         if (cols.length >= 4 && cols[0]) {
-          const typeStr = (cols[1] || '').toLowerCase();
-          const typeMap = typeStr.includes('reunión') ? 'reunion' : typeStr.includes('reporte') ? 'reporte' : 'trabajo';
+          const importedLabel = (cols[1] || '').toLowerCase().trim();
+          
+          // Buscar el tipo exacto, si no existe o se borró, usamos el primero disponible
+          const typeMap = reverseTypeMap[importedLabel] || clientTypes[0]?.value || 'trabajo';
+
+          // Reemplazar comas por puntos para los decimales si se editó en un Excel en español
+          const hoursStr = (cols[3] || '0').replace(',', '.');
+          const parsedHours = parseFloat(hoursStr);
+
+          // Limpieza exhaustiva de la variable "Sí/No"
+          const oppStr = (cols[5] || '').toLowerCase().trim();
+          const isOpportunity = oppStr === 'sí' || oppStr === 'si' || oppStr === 'true' || oppStr === 'yes';
 
           newRecords.push({
             client_id: clientId,
             date: cols[0],
             type: typeMap,
             area: cols[2] || 'Otros',
-            hours: parseFloat(cols[3]) || 0,
+            hours: isNaN(parsedHours) ? 0 : parsedHours,
             impact: cols[4] || '',
-            opportunity: (cols[5] || '').toLowerCase() === 'sí' || (cols[5] || '').toLowerCase() === 'si',
+            opportunity: isOpportunity,
             notes: cols[6] || ''
           });
         }
@@ -147,10 +172,17 @@ export default function ClientAdmin() {
         if (!error) {
           queryClient.invalidateQueries({ queryKey: ['activities', clientId] });
           showSuccess(`Se importaron ${newRecords.length} actividades correctamente`);
-        } else showError("Error guardando en la base de datos");
+        } else {
+          console.error("Database import error:", error);
+          showError("Error guardando en la base de datos");
+        }
+      } else {
+        showError("No se encontraron registros válidos para importar");
       }
     };
+    
     reader.readAsText(file);
+    // Limpiamos el input para permitir volver a subir el mismo archivo si hubo un error
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -165,7 +197,6 @@ export default function ClientAdmin() {
 
   const clientHours = client.monthly_hours ?? MONTHLY_BUDGET;
   const clientAreas = client.areas ?? AREAS;
-  const clientTypes = client.activity_types ?? DEFAULT_TYPES;
   const typeLabelsMap = clientTypes.reduce((acc: any, t: any) => ({...acc, [t.value]: t.label}), {});
 
   const opportunities = filteredRecords.filter(r => r.opportunity);
@@ -191,7 +222,6 @@ export default function ClientAdmin() {
               </div>
             </div>
 
-            {/* Selector de Mes */}
             <div className="flex items-center gap-2 sm:ml-6 bg-black/20 p-1.5 rounded-lg border border-white/10">
               <CalendarDays className="h-4 w-4 text-[#D9E021] ml-2" />
               <select 
