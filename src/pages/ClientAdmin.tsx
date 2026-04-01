@@ -9,6 +9,8 @@ import { AdminForm } from "@/components/consulting/AdminForm";
 import { AdminTable } from "@/components/consulting/AdminTable";
 import { showSuccess, showError } from "@/utils/toast";
 import { ActivityRecord, TYPE_LABELS } from "@/lib/consulting-data";
+import { JengibreFooter } from "@/components/JengibreFooter";
+import logoUrl from "@/assets/logo.jpg";
 
 export default function ClientAdmin() {
   const { clientId } = useParams();
@@ -147,17 +149,20 @@ export default function ClientAdmin() {
   const opportunities = records.filter(r => r.opportunity);
 
   return (
-    <div className="min-h-screen bg-[#f5f5f5] text-slate-900 pb-12 font-sans">
-      <div className="max-w-[1200px] mx-auto px-4 pt-8">
+    <div className="min-h-screen bg-[#f5f5f5] text-slate-900 flex flex-col font-sans">
+      <div className="max-w-[1200px] mx-auto px-4 pt-8 flex-1 w-full">
         
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-5 rounded-lg shadow-sm border border-slate-200 mb-8 gap-4">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="text-slate-500 hover:bg-slate-100">
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h1 className="text-2xl font-semibold text-blue-600 flex items-center gap-2">
-              🏦 {client.name} <span className="text-sm font-normal text-slate-400 ml-2">(Admin)</span>
-            </h1>
+            <div className="flex items-center gap-3">
+              <img src={logoUrl} alt="Jengibre Logo" className="h-10 w-10 rounded-lg shadow-sm object-cover" />
+              <h1 className="text-2xl font-semibold text-[#2b2d75] flex items-center gap-2">
+                {client.name} <span className="text-sm font-normal text-slate-400 ml-2">(Admin)</span>
+              </h1>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
@@ -199,6 +204,8 @@ export default function ClientAdmin() {
           )}
         </div>
       </div>
+      
+      <JengibreFooter />
     </div>
   );
 }

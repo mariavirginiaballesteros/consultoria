@@ -5,8 +5,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Plus, ArrowRight, Trash2, Copy, DatabaseZap } from "lucide-react";
+import { Plus, ArrowRight, Trash2, Copy, DatabaseZap } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
+import { JengibreFooter } from "@/components/JengibreFooter";
+import logoUrl from "@/assets/logo.jpg";
 
 export default function Index() {
   const navigate = useNavigate();
@@ -64,12 +66,14 @@ export default function Index() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f5f5f5] text-slate-900 py-12 font-sans">
-      <div className="max-w-[800px] mx-auto px-4">
+    <div className="min-h-screen bg-[#f5f5f5] text-slate-900 pt-12 flex flex-col font-sans">
+      <div className="max-w-[800px] mx-auto px-4 flex-1 w-full">
         
         <header className="mb-10 text-center">
-          <h1 className="text-3xl font-bold text-slate-900 flex items-center justify-center gap-3 mb-2">
-            <Building2 className="h-8 w-8 text-blue-600" />
+          <div className="flex justify-center mb-4">
+            <img src={logoUrl} alt="Jengibre Logo" className="h-20 w-20 rounded-2xl shadow-md object-cover" />
+          </div>
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">
             Portal de Consultoría
           </h1>
           <p className="text-slate-500">Administra tus clientes y horas de servicio</p>
@@ -104,7 +108,7 @@ export default function Index() {
                 className="flex-1"
                 disabled={createClient.isPending}
               />
-              <Button type="submit" disabled={!newClientName.trim() || createClient.isPending} className="bg-blue-600 hover:bg-blue-700 text-white">
+              <Button type="submit" disabled={!newClientName.trim() || createClient.isPending} className="bg-[#2b2d75] hover:bg-[#1e1f52] text-white">
                 <Plus className="h-4 w-4 mr-2" />
                 Crear
               </Button>
@@ -148,6 +152,8 @@ export default function Index() {
           </div>
         )}
       </div>
+      
+      <JengibreFooter />
     </div>
   );
 }
