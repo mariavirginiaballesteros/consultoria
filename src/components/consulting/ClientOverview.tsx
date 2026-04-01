@@ -2,7 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { ActivityRecord } from "@/lib/consulting-data";
-import { Users, Zap, FileText, CheckCircle2, MessageSquare, Calendar, FolderTree } from "lucide-react";
+import { Users, Zap, FileText, CheckCircle2, MessageSquare, Calendar, FolderTree, Clock } from "lucide-react";
 
 interface ClientOverviewProps {
   records: ActivityRecord[];
@@ -12,7 +12,10 @@ interface ClientOverviewProps {
 }
 
 export function ClientOverview({ records, monthlyHours, typeLabels, onUpdateClientNote }: ClientOverviewProps) {
-  const totalHours = records.reduce((sum, r) => sum + r.hours, 0);
+  // Filtramos para NO mostrar las oportunidades en este listado (van abajo en su propia caja)
+  const regularRecords = records.filter(r => !r.opportunity);
+  
+  const totalHours = regularRecords.reduce((sum, r) => sum + r.hours, 0);
   const percentage = Math.min((totalHours / monthlyHours) * 100, 100);
   const isOverBudget = totalHours > monthlyHours;
 
@@ -45,7 +48,7 @@ export function ClientOverview({ records, monthlyHours, typeLabels, onUpdateClie
         <CardContent className="p-6">
           <h2 className="text-sm font-bold mb-6 text-[#2A2B73] uppercase tracking-wide">Detalle completo de actividades</h2>
           <div id="activity-list-container" className="space-y-5">
-            {records.map(r => (
+            {regularRecords.map(r => (
               <div key={r.id} className="p-5 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col gap-4 transition-all hover:shadow-md">
                 
                 {/* Cabecera */}
@@ -61,7 +64,10 @@ export function ClientOverview({ records, monthlyHours, typeLabels, onUpdateClie
                       {getTypeIcon(r.type)} {typeLabels[r.type] || r.type}
                     </div>
                   </div>
-                  <span className="text-xl font-black text-[#2A2B73] bg-[#D9E021]/20 px-4 py-1 rounded-lg">{r.hours}h</span>
+                  <span className="flex items-center text-xl font-black text-[#2A2B73] bg-[#D9E021]/20 px-4 py-1 rounded-lg">
+                    <Clock className="h-5 w-5 mr-1.5 text-[#2A2B73]" />
+                    {r.hours}h
+                  </span>
                 </div>
 
                 {/* Contenido admin */}
@@ -105,7 +111,7 @@ export function ClientOverview({ records, monthlyHours, typeLabels, onUpdateClie
                 )}
               </div>
             ))}
-            {records.length === 0 && <div className="text-center text-slate-400 py-10 bg-white rounded-xl border border-slate-200">No hay actividades registradas en este periodo.</div>}
+            {regularRecords.length === 0 && <div className="text-center text-slate-400 py-10 bg-white rounded-xl border border-slate-200">No hay actividades registradas en este periodo.</div>}
           </div>
         </CardContent>
       </Card>

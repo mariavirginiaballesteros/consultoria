@@ -31,7 +31,7 @@ export default function ClientView() {
   const { data: allRecords = [], isLoading: recordsLoading } = useQuery({
     queryKey: ['activities', clientId],
     queryFn: async () => {
-      const { data, error } = await supabase.from('activities').select('*').eq('client_id', clientId).order('date', { ascending: false });
+      const { data, error } = await supabase.from('activities').select('*').eq('client_id', clientId).order('date', { ascending: true });
       if (error) throw error;
       return data as ActivityRecord[];
     },
@@ -73,7 +73,9 @@ export default function ClientView() {
   }, [allRecords, clientStartDay]);
 
   const filteredRecords = useMemo(() => {
-    return allRecords.filter(r => getPeriodInfo(r.date, clientStartDay).id === selectedPeriodId);
+    return allRecords
+      .filter(r => getPeriodInfo(r.date, clientStartDay).id === selectedPeriodId)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [allRecords, selectedPeriodId, clientStartDay]);
 
   const opportunities = filteredRecords.filter(r => r.opportunity);
@@ -224,9 +226,16 @@ export default function ClientView() {
               </h2>
               <div className="space-y-0 mb-2">
                 {opportunities.map(opp => (
-                  <div key={opp.id} className="py-3 border-b border-slate-100 last:border-0 text-sm text-slate-600">
-                    <strong className="block text-[#2A2B73] mb-1 font-bold">{opp.area}</strong>
-                    {opp.impact}
+                  <div key={opp.id} className="py-3 border-b border-slate-100 last:border-0 text-sm text-slate-600 flex justify-between items-start gap-4">
+                    <div>
+                      <strong className="block text-[#2A2B73] mb-1 font-bold">{opp.area}</strong>
+                      {opp.impact}
+                    </div>
+                    {opp.hours > 0 && (
+                      <span className="shrink-0 flex items-center font-bold text-xs text-[#2A2B73] bg-slate-100 px-2 py-1 rounded">
+                        <Clock className="h-3 w-3 mr-1" /> {opp.hours}h estimadas
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>

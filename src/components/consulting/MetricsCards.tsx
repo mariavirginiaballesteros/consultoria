@@ -8,10 +8,13 @@ interface MetricsCardsProps {
 }
 
 export function MetricsCards({ records, isClientView, monthlyHours }: MetricsCardsProps) {
-  const totalHours = records.reduce((sum, r) => sum + r.hours, 0);
+  // Filtramos las actividades regulares (que no son oportunidades) para el conteo de horas
+  const regularRecords = records.filter(r => !r.opportunity);
+  
+  const totalHours = regularRecords.reduce((sum, r) => sum + r.hours, 0);
   const extraHours = Math.max(totalHours - monthlyHours, 0);
-  const meetingHours = records.filter(r => r.type === 'reunion').reduce((sum, r) => sum + r.hours, 0);
-  const meetingCount = records.filter(r => r.type === 'reunion').length;
+  const meetingHours = regularRecords.filter(r => r.type === 'reunion').reduce((sum, r) => sum + r.hours, 0);
+  const meetingCount = regularRecords.filter(r => r.type === 'reunion').length;
   const opportunities = records.filter(r => r.opportunity).length;
 
   return (

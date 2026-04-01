@@ -2,7 +2,7 @@ import { useState, useRef, useMemo, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Copy, Download, Upload, Settings, CalendarDays } from "lucide-react";
+import { ArrowLeft, Copy, Download, Upload, Settings, CalendarDays, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MetricsCards } from "@/components/consulting/MetricsCards";
 import { AdminForm } from "@/components/consulting/AdminForm";
@@ -34,7 +34,7 @@ export default function ClientAdmin() {
   const { data: allRecords = [], isLoading: recordsLoading } = useQuery({
     queryKey: ['activities', clientId],
     queryFn: async () => {
-      const { data, error } = await supabase.from('activities').select('*').eq('client_id', clientId).order('created_at', { ascending: true });
+      const { data, error } = await supabase.from('activities').select('*').eq('client_id', clientId).order('date', { ascending: true });
       if (error) throw error;
       return data as ActivityRecord[];
     }
@@ -92,7 +92,6 @@ export default function ClientAdmin() {
     }
   });
 
-  // Agrupar y crear selector de periodos
   const uniquePeriods = useMemo(() => {
     const periodsMap = new Map();
     allRecords.forEach(r => {
@@ -100,7 +99,6 @@ export default function ClientAdmin() {
       if (!periodsMap.has(p.id)) periodsMap.set(p.id, p);
     });
     
-    // Asegurarse de que el periodo actual exista siempre en el selector
     const current = getPeriodInfo(new Date().toISOString().split('T')[0], clientStartDay);
     if (!periodsMap.has(current.id)) periodsMap.set(current.id, current);
 
@@ -108,7 +106,9 @@ export default function ClientAdmin() {
   }, [allRecords, clientStartDay]);
 
   const filteredRecords = useMemo(() => {
-    return allRecords.filter(r => getPeriodInfo(r.date, clientStartDay).id === selectedPeriodId);
+    return allRecords
+      .filter(r => getPeriodInfo(r.date, clientStartDay).id === selectedPeriodId)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [allRecords, selectedPeriodId, clientStartDay]);
 
   const clientTypes = client?.activity_types ?? DEFAULT_TYPES;
@@ -282,9 +282,16 @@ export default function ClientAdmin() {
               </h2>
               <div className="space-y-0 mb-2">
                 {opportunities.map(opp => (
-                  <div key={opp.id} className="py-3 border-b border-slate-100 last:border-0 text-sm text-slate-600">
-                    <strong className="block text-[#2A2B73] mb-1 font-bold">{opp.area}</strong>
-                    {opp.impact}
+                  <div key={opp.id} className="py-3 border-b border-slate-100 last:border-0 text-sm text-slate-600 flex justify-between items-start gap-4">
+                    <div>
+                      <strong className="block text-[#2A2B73] mb-1 font-bold">{opp.area}</strong>
+                      {opp.impact}
+                    </div>
+                    {opp.hours > 0 && (
+                      <span className="shrink-0 flex items-center font-bold text-xs text-[#2A2B73] bg-slate-100 px-2 py-1 rounded">
+                        <Clock className="h-3 w-3 mr-1" /> {opp.hours}h estimadas
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>

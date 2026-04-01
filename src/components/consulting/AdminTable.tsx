@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Trash2, Pencil, Check, Users, Zap, FileText, CheckCircle2 } from "lucide-react";
+import { Trash2, Pencil, Check, Users, Zap, FileText, CheckCircle2, Clock } from "lucide-react";
 import { ActivityRecord } from "@/lib/consulting-data";
 
 interface AdminTableProps {
@@ -99,7 +99,11 @@ export function AdminTable({ records, onEdit, onDelete, typeLabels }: AdminTable
                   </div>
                 </TableCell>
                 <TableCell className="text-xs text-slate-600">{r.area}</TableCell>
-                <TableCell className="text-center font-bold text-xs text-[#2A2B73]">{r.hours}h</TableCell>
+                <TableCell className="text-center font-bold text-xs text-[#2A2B73]">
+                  <div className="flex items-center justify-center gap-1">
+                    <Clock className="h-3 w-3" /> {r.hours}h
+                  </div>
+                </TableCell>
                 <TableCell className="text-xs max-w-[150px] sm:max-w-[250px] truncate text-slate-600" title={r.impact}>{r.impact}</TableCell>
                 <TableCell className="text-center">
                   {r.opportunity && <Check className="h-5 w-5 mx-auto text-[#E32462]" strokeWidth={3} />}
