@@ -32,38 +32,40 @@ export default function ClientView() {
 
   if (clientLoading || recordsLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f5f5f5]">
-        <Loader2 className="h-8 w-8 animate-spin text-[#2b2d75]" />
+      <div className="min-h-screen flex items-center justify-center bg-[#F4F5F8]">
+        <Loader2 className="h-10 w-10 animate-spin text-[#D9E021]" />
       </div>
     );
   }
 
   if (!client) {
-    return <div className="min-h-screen p-10 text-center text-slate-600">Este enlace no es válido o el cliente fue eliminado.</div>;
+    return <div className="min-h-screen p-10 text-center text-slate-600 font-medium">Este enlace no es válido o el cliente fue eliminado.</div>;
   }
 
   const dateStr = new Date().toLocaleString('es-ES', { month: 'long', year: 'numeric' });
   const formattedDate = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
 
   return (
-    <div className="min-h-screen bg-[#f5f5f5] text-slate-900 flex flex-col font-sans selection:bg-[#2b2d75]/20">
+    <div className="min-h-screen bg-[#F4F5F8] text-slate-900 flex flex-col font-sans selection:bg-[#62BAD3]/30">
       <div className="max-w-[1200px] mx-auto px-4 pt-8 flex-1 w-full">
         
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-5 md:p-6 rounded-lg shadow-sm border border-slate-200 mb-8 gap-4">
-          <div className="flex items-center gap-4">
-            <img src={logoUrl} alt="Jengibre Logo" className="h-12 w-12 rounded-lg shadow-sm object-cover" />
-            <div className="flex flex-col md:flex-row md:items-center md:gap-2">
-              <h1 className="text-xl md:text-2xl font-semibold text-[#2b2d75]">
+        <header className="relative flex flex-col md:flex-row justify-between items-start md:items-center bg-[#2A2B73] p-6 md:p-8 rounded-2xl shadow-xl border-b-4 border-[#D9E021] mb-8 gap-4 overflow-hidden">
+          <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-[#E32462] rounded-full blur-[80px] opacity-20"></div>
+          
+          <div className="relative z-10 flex items-center gap-5">
+            <img src={logoUrl} alt="Jengibre Logo" className="h-16 w-16 rounded-2xl shadow-lg object-cover border-2 border-[#D9E021]" />
+            <div className="flex flex-col">
+              <h1 className="text-2xl md:text-3xl font-black text-white leading-tight">
                 {client.name}
               </h1>
-              <span className="text-slate-400 font-medium hidden md:inline-block">/</span>
-              <span className="text-sm md:text-lg font-medium text-slate-500">{formattedDate}</span>
+              <span className="text-base font-bold text-[#62BAD3]">{formattedDate}</span>
             </div>
           </div>
-          <div className="flex items-center text-xs md:text-sm text-green-600 bg-green-50 px-3 py-1.5 rounded-full border border-green-200 font-medium">
-            <span className="relative flex h-2 w-2 mr-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+          
+          <div className="relative z-10 flex items-center text-xs md:text-sm text-[#2A2B73] bg-[#D9E021] px-4 py-2 rounded-full font-bold shadow-sm">
+            <span className="relative flex h-2.5 w-2.5 mr-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
             </span>
             Sincronizado
           </div>

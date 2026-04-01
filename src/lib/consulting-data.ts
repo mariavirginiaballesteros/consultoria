@@ -1,7 +1,7 @@
 export type ActivityType = 'reunion' | 'trabajo' | 'reporte';
 
 export interface ActivityRecord {
-  id: string; // Cambiado a string para soportar UUID de Supabase
+  id: string;
   client_id?: string;
   date: string;
   type: ActivityType;
@@ -16,9 +16,9 @@ export interface ActivityRecord {
 export const MONTHLY_BUDGET = 20;
 
 export const TYPE_LABELS: Record<ActivityType, string> = {
-  reunion: '👥 Reunión',
-  trabajo: '📋 Trabajo/Análisis',
-  reporte: '📊 Reporte'
+  reunion: 'Reunión',
+  trabajo: 'Trabajo / Análisis',
+  reporte: 'Reporte'
 };
 
 export const AREAS = [
