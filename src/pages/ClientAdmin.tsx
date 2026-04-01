@@ -1,8 +1,8 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Copy, Download, Upload, Settings } from "lucide-react";
+import { ArrowLeft, Copy, Download, Upload, Settings, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MetricsCards } from "@/components/consulting/MetricsCards";
 import { AdminForm } from "@/components/consulting/AdminForm";
@@ -18,6 +18,9 @@ export default function ClientAdmin() {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const currentYYYYMM = new Date().toISOString().slice(0, 7);
+  const [selectedMonth, setSelectedMonth] = useState(currentYYYYMM);
+
   const { data: client, isLoading: clientLoading } = useQuery({
     queryKey: ['client', clientId],
     queryFn: async () => {
@@ -27,7 +30,7 @@ export default function ClientAdmin() {
     }
   });
 
-  const { data: records = [], isLoading: recordsLoading } = useQuery({
+  const { data: allRecords = [], isLoading: recordsLoading } = useQuery({
     queryKey: ['activities', clientId],
     queryFn: async () => {
       const { data, error } = await supabase.from('activities').select('*').eq('client_id', clientId).order('created_at', { ascending: true });
@@ -42,8 +45,11 @@ export default function ClientAdmin() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['activities', clientId] });
+      // Si la actividad añadida es de un mes diferente al seleccionado, cambiamos la vista a ese mes
+      const recordMonth = data.date.slice(0, 7);
+      if (recordMonth !== selectedMonth) setSelectedMonth(recordMonth);
     },
     onError: () => showError("Error al guardar la actividad")
   });
@@ -59,10 +65,28 @@ export default function ClientAdmin() {
     }
   });
 
+  // Filtrado de meses
+  const uniqueMonths = useMemo(() => {
+    const months = new Set(allRecords.map(r => r.date.slice(0, 7)));
+    months.add(currentYYYYMM);
+    return Array.from(months).sort().reverse();
+  }, [allRecords, currentYYYYMM]);
+
+  const filteredRecords = useMemo(() => {
+    return allRecords.filter(r => r.date.startsWith(selectedMonth));
+  }, [allRecords, selectedMonth]);
+
+  const getMonthName = (yyyyMM: string) => {
+    const [year, month] = yyyyMM.split('-');
+    const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+    const monthName = date.toLocaleString('es-ES', { month: 'long' });
+    return `${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${year}`;
+  };
+
   const handleExportCSV = () => {
     const typeLabelsMap = clientTypes.reduce((acc: any, t: any) => ({...acc, [t.value]: t.label}), {});
     const rows = [['Fecha', 'Tipo', 'Área', 'Horas', 'Impacto', 'Oportunidad No Cubierta', 'Notas']];
-    records.forEach(r => {
+    filteredRecords.forEach(r => {
       rows.push([
         r.date, typeLabelsMap[r.type] || r.type, r.area, r.hours.toString(),
         r.impact, r.opportunity ? 'Sí' : 'No', r.notes
@@ -72,12 +96,11 @@ export default function ClientAdmin() {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `reporte-${client?.name.toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `reporte-${client?.name.toLowerCase().replace(/\s+/g, '-')}-${selectedMonth}.csv`;
     link.click();
   };
 
   const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    // ... logic remains identical
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -140,55 +163,70 @@ export default function ClientAdmin() {
   if (clientLoading) return <div className="min-h-screen p-10 text-center font-medium">Cargando...</div>;
   if (!client) return <div className="min-h-screen p-10 text-center font-medium">Cliente no encontrado</div>;
 
-  // Extraemos variables dinámicas del cliente (o usamos default como fallback)
   const clientHours = client.monthly_hours ?? MONTHLY_BUDGET;
   const clientAreas = client.areas ?? AREAS;
   const clientTypes = client.activity_types ?? DEFAULT_TYPES;
   const typeLabelsMap = clientTypes.reduce((acc: any, t: any) => ({...acc, [t.value]: t.label}), {});
 
-  const opportunities = records.filter(r => r.opportunity);
+  const opportunities = filteredRecords.filter(r => r.opportunity);
 
   return (
     <div className="min-h-screen bg-[#F4F5F8] text-slate-900 flex flex-col font-sans">
       <div className="max-w-[1200px] mx-auto px-4 pt-8 flex-1 w-full">
         
-        <header className="relative flex flex-col md:flex-row justify-between items-start md:items-center bg-[#2A2B73] p-5 md:p-6 rounded-2xl shadow-lg border-b-4 border-[#D9E021] mb-8 gap-4 overflow-hidden">
+        <header className="relative flex flex-col lg:flex-row justify-between items-start lg:items-center bg-[#2A2B73] p-5 md:p-6 rounded-2xl shadow-lg border-b-4 border-[#D9E021] mb-8 gap-4 overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-[#62BAD3] rounded-full blur-[80px] opacity-20 -translate-y-1/2 translate-x-1/3"></div>
           
-          <div className="relative z-10 flex items-center gap-4 w-full md:w-auto">
+          <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full lg:w-auto">
             <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="text-white hover:bg-white/10 shrink-0">
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div className="flex items-center gap-3">
               <img src={logoUrl} alt="Jengibre Logo" className="h-12 w-12 rounded-xl shadow-md object-cover border-2 border-[#D9E021]" />
               <div className="flex flex-col">
-                <h1 className="text-2xl font-black text-white leading-tight">
+                <h1 className="text-2xl font-black text-white leading-tight truncate max-w-[200px] sm:max-w-full">
                   {client.name}
                 </h1>
-                <span className="text-sm font-bold text-[#D9E021] flex items-center gap-1"><Settings className="h-3 w-3" /> Panel de Administración</span>
+                <span className="text-sm font-bold text-[#D9E021] flex items-center gap-1"><Settings className="h-3 w-3" /> Administración</span>
               </div>
+            </div>
+
+            {/* Selector de Mes */}
+            <div className="flex items-center gap-2 sm:ml-6 bg-black/20 p-1.5 rounded-lg border border-white/10">
+              <CalendarDays className="h-4 w-4 text-[#D9E021] ml-2" />
+              <select 
+                value={selectedMonth} 
+                onChange={e => setSelectedMonth(e.target.value)}
+                className="bg-transparent text-white font-bold text-sm outline-none cursor-pointer pr-2 appearance-none"
+              >
+                {uniqueMonths.map(m => (
+                  <option key={m} value={m} className="text-slate-900 font-medium">
+                    {getMonthName(m)}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
-          <div className="relative z-10 flex flex-wrap items-center gap-3 w-full md:w-auto ml-[60px] md:ml-0">
+          <div className="relative z-10 flex flex-wrap items-center gap-3 w-full lg:w-auto mt-2 lg:mt-0">
             <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={handleImportCSV} />
-            <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="h-10 border-white/20 bg-white/5 text-white hover:bg-white/20 hover:text-white">
-              <Upload className="h-4 w-4 mr-2" /> Importar
+            <Button onClick={() => fileInputRef.current?.click()} variant="outline" size="sm" className="h-9 border-white/20 bg-white/5 text-white hover:bg-white/20 hover:text-white flex-1 sm:flex-none">
+              <Upload className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Importar</span>
             </Button>
-            <Button onClick={handleExportCSV} variant="outline" className="h-10 border-white/20 bg-white/5 text-white hover:bg-white/20 hover:text-white">
-              <Download className="h-4 w-4 mr-2" /> Exportar
+            <Button onClick={handleExportCSV} variant="outline" size="sm" className="h-9 border-white/20 bg-white/5 text-white hover:bg-white/20 hover:text-white flex-1 sm:flex-none">
+              <Download className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Exportar Mes</span>
             </Button>
-            <Button onClick={copyClientLink} className="h-10 bg-[#D9E021] text-[#2A2B73] hover:bg-[#c6cc1b] font-bold">
-              <Copy className="h-4 w-4 mr-2" /> Link Cliente
+            <Button onClick={copyClientLink} size="sm" className="h-9 bg-[#D9E021] text-[#2A2B73] hover:bg-[#c6cc1b] font-bold flex-1 sm:flex-none">
+              <Copy className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Link Cliente</span>
             </Button>
           </div>
         </header>
 
-        <MetricsCards records={records} isClientView={false} monthlyHours={clientHours} />
+        <MetricsCards records={filteredRecords} isClientView={false} monthlyHours={clientHours} />
 
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
           <AdminForm onAdd={(data) => addRecord.mutate(data)} areas={clientAreas} activityTypes={clientTypes} />
-          <AdminTable records={records} onDelete={(id) => {
+          <AdminTable records={filteredRecords} onDelete={(id) => {
             if(window.confirm("¿Seguro que deseas borrar esto?")) deleteRecord.mutate(id);
           }} typeLabels={typeLabelsMap} />
 
@@ -196,7 +234,7 @@ export default function ClientAdmin() {
             <div className="bg-white border-2 border-[#E32462]/30 rounded-xl p-6 mb-8 shadow-sm relative overflow-hidden">
               <div className="absolute top-0 left-0 w-1.5 h-full bg-[#E32462]"></div>
               <h2 className="text-[#E32462] font-bold text-sm mb-4 flex items-center gap-2 uppercase tracking-wide">
-                🚀 Oportunidades de proyectos extra detectadas
+                🚀 Oportunidades de proyectos extra detectadas ({getMonthName(selectedMonth)})
               </h2>
               <div className="space-y-0 mb-2">
                 {opportunities.map(opp => (

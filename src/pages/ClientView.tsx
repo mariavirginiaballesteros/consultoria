@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { MetricsCards } from "@/components/consulting/MetricsCards";
 import { ClientOverview } from "@/components/consulting/ClientOverview";
 import { ActivityRecord, MONTHLY_BUDGET, DEFAULT_TYPES } from "@/lib/consulting-data";
-import { Loader2, FileDown } from "lucide-react";
+import { Loader2, FileDown, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { JengibreFooter } from "@/components/JengibreFooter";
 import { showSuccess, showError } from "@/utils/toast";
@@ -16,6 +16,9 @@ import logoUrl from "@/assets/logo.jpg";
 export default function ClientView() {
   const { clientId } = useParams();
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  
+  const currentYYYYMM = new Date().toISOString().slice(0, 7);
+  const [selectedMonth, setSelectedMonth] = useState(currentYYYYMM);
 
   const { data: client, isLoading: clientLoading } = useQuery({
     queryKey: ['client', clientId],
@@ -26,7 +29,7 @@ export default function ClientView() {
     }
   });
 
-  const { data: records = [], isLoading: recordsLoading } = useQuery({
+  const { data: allRecords = [], isLoading: recordsLoading } = useQuery({
     queryKey: ['activities', clientId],
     queryFn: async () => {
       const { data, error } = await supabase.from('activities').select('*').eq('client_id', clientId).order('created_at', { ascending: true });
@@ -35,6 +38,24 @@ export default function ClientView() {
     },
     refetchInterval: 5000 
   });
+
+  // Filtrado de meses
+  const uniqueMonths = useMemo(() => {
+    const months = new Set(allRecords.map(r => r.date.slice(0, 7)));
+    months.add(currentYYYYMM);
+    return Array.from(months).sort().reverse();
+  }, [allRecords, currentYYYYMM]);
+
+  const filteredRecords = useMemo(() => {
+    return allRecords.filter(r => r.date.startsWith(selectedMonth));
+  }, [allRecords, selectedMonth]);
+
+  const getMonthName = (yyyyMM: string) => {
+    const [year, month] = yyyyMM.split('-');
+    const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+    const monthName = date.toLocaleString('es-ES', { month: 'long' });
+    return `${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${year}`;
+  };
 
   const generatePDF = async () => {
     const element = document.getElementById("pdf-content");
@@ -83,7 +104,7 @@ export default function ClientView() {
         heightLeft -= pageHeight;
       }
 
-      pdf.save(`Reporte_Jengibre_${client?.name.replace(/\s+/g, '_')}.pdf`);
+      pdf.save(`Reporte_Jengibre_${client?.name.replace(/\s+/g, '_')}_${selectedMonth}.pdf`);
       showSuccess("PDF descargado correctamente con todas las tareas");
     } catch (error) {
       console.error(error);
@@ -108,9 +129,6 @@ export default function ClientView() {
   if (!client) {
     return <div className="min-h-screen p-10 text-center text-slate-600 font-medium">Este enlace no es válido o el cliente fue eliminado.</div>;
   }
-
-  const dateStr = new Date().toLocaleString('es-ES', { month: 'long', year: 'numeric' });
-  const formattedDate = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
 
   const clientHours = client.monthly_hours ?? MONTHLY_BUDGET;
   const clientTypes = client.activity_types ?? DEFAULT_TYPES;
@@ -139,17 +157,37 @@ export default function ClientView() {
         <header className="relative flex flex-col md:flex-row justify-between items-start md:items-center bg-[#2A2B73] p-6 md:p-8 rounded-2xl shadow-xl border-b-4 border-[#D9E021] mb-8 gap-4 overflow-hidden">
           <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-[#E32462] rounded-full blur-[80px] opacity-20"></div>
           
-          <div className="relative z-10 flex items-center gap-5">
+          <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center gap-5 w-full md:w-auto">
             <img src={logoUrl} alt="Jengibre Logo" className="h-16 w-16 rounded-2xl shadow-lg object-cover border-2 border-[#D9E021]" />
             <div className="flex flex-col">
               <h1 className="text-2xl md:text-3xl font-black text-white leading-tight">
                 {client.name}
               </h1>
-              <span className="text-base font-bold text-[#62BAD3]">{formattedDate}</span>
+              
+              {/* Selector de Mes para el Cliente */}
+              <div className="mt-2 flex items-center bg-black/20 w-fit px-3 py-1.5 rounded-lg border border-white/10" data-html2canvas-ignore>
+                <CalendarDays className="h-4 w-4 text-[#D9E021] mr-2" />
+                <select 
+                  value={selectedMonth} 
+                  onChange={e => setSelectedMonth(e.target.value)}
+                  className="bg-transparent text-white font-bold text-sm outline-none cursor-pointer pr-2 appearance-none"
+                >
+                  {uniqueMonths.map(m => (
+                    <option key={m} value={m} className="text-slate-900 font-medium">
+                      {getMonthName(m)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              {/* Elemento que sólo se verá en el PDF estático */}
+              <span className="hidden text-base font-bold text-[#62BAD3] mt-1" data-html2canvas-show style={{ display: 'none' }}>
+                {getMonthName(selectedMonth)}
+              </span>
             </div>
           </div>
           
-          <div className="relative z-10 flex items-center text-xs md:text-sm text-[#2A2B73] bg-[#D9E021] px-4 py-2 rounded-full font-bold shadow-sm">
+          <div className="relative z-10 flex items-center text-xs md:text-sm text-[#2A2B73] bg-[#D9E021] px-4 py-2 rounded-full font-bold shadow-sm mt-4 md:mt-0">
             <span className="relative flex h-2.5 w-2.5 mr-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
@@ -158,10 +196,16 @@ export default function ClientView() {
           </div>
         </header>
 
-        <MetricsCards records={records} isClientView={true} monthlyHours={clientHours} />
+        {/* Pequeño script para manejar la visibilidad al renderizar PDF */}
+        <style dangerouslySetInnerHTML={{__html: `
+          #pdf-content[data-rendering="true"] [data-html2canvas-ignore] { display: none !important; }
+          #pdf-content[data-rendering="true"] [data-html2canvas-show] { display: block !important; }
+        `}} />
+
+        <MetricsCards records={filteredRecords} isClientView={true} monthlyHours={clientHours} />
 
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <ClientOverview records={records} monthlyHours={clientHours} typeLabels={typeLabelsMap} />
+          <ClientOverview records={filteredRecords} monthlyHours={clientHours} typeLabels={typeLabelsMap} />
         </div>
 
         <div className="mt-8 pt-8">
