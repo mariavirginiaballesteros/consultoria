@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Download, AlertCircle, Pencil, Trash2, RotateCcw } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Download, AlertCircle, Pencil, Trash2, RotateCcw, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { INITIAL_RECORDS, ActivityRecord, TYPE_LABELS } from "@/lib/consulting-data";
@@ -7,10 +7,11 @@ import { MetricsCards } from "@/components/consulting/MetricsCards";
 import { AdminForm } from "@/components/consulting/AdminForm";
 import { AdminTable } from "@/components/consulting/AdminTable";
 import { ClientOverview } from "@/components/consulting/ClientOverview";
-import { showSuccess } from "@/utils/toast";
+import { showSuccess, showError } from "@/utils/toast";
 
 export default function Index() {
   const [view, setView] = useState<'admin' | 'cliente'>('admin');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Cargar datos de localStorage o usar los iniciales
   const [records, setRecords] = useState<ActivityRecord[]>(() => {
@@ -85,6 +86,76 @@ export default function Index() {
     link.click();
   };
 
+  const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      if (!text) return;
+
+      const lines = text.split('\n');
+      const newRecords: ActivityRecord[] = [];
+      let maxId = records.length > 0 ? Math.max(...records.map(r => r.id)) : 0;
+
+      // Empezar desde 1 para saltar la fila de encabezados
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        // Parseador básico de CSV que respeta las comillas dobles
+        const cols = [];
+        let insideQuote = false;
+        let currentStr = "";
+        for (let j = 0; j < line.length; j++) {
+          if (line[j] === '"') {
+            insideQuote = !insideQuote;
+          } else if (line[j] === ',' && !insideQuote) {
+            cols.push(currentStr);
+            currentStr = "";
+          } else {
+            currentStr += line[j];
+          }
+        }
+        cols.push(currentStr);
+
+        // Validar si tiene suficientes columnas para ser un registro válido
+        if (cols.length >= 4 && cols[0]) {
+          maxId++;
+          
+          // Detectar el tipo de actividad
+          const typeStr = (cols[1] || '').toLowerCase();
+          const typeMap = typeStr.includes('reunión') ? 'reunion' : typeStr.includes('reporte') ? 'reporte' : 'trabajo';
+
+          newRecords.push({
+            id: maxId,
+            date: cols[0],
+            type: typeMap,
+            area: cols[2] || 'Otros',
+            hours: parseFloat(cols[3]) || 0,
+            impact: cols[4] || '',
+            opportunity: (cols[5] || '').toLowerCase() === 'sí' || (cols[5] || '').toLowerCase() === 'si',
+            notes: cols[6] || ''
+          });
+        }
+      }
+
+      if (newRecords.length > 0) {
+        setRecords(prev => [...prev, ...newRecords]);
+        showSuccess(`Se importaron ${newRecords.length} actividades correctamente`);
+      } else {
+        showError("No se encontraron registros válidos en el archivo");
+      }
+    };
+    reader.readAsText(file);
+    
+    // Resetear el input file para permitir cargar el mismo archivo nuevamente si es necesario
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const opportunities = records.filter(r => r.opportunity);
   
   // Format current month and year nicely
@@ -137,9 +208,33 @@ export default function Index() {
                 Cliente
               </button>
             </div>
-            <Button onClick={handleExportCSV} variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50 h-9">
-              📊 Exportar CSV
-            </Button>
+            
+            <div className="flex gap-2">
+              <input 
+                type="file" 
+                accept=".csv" 
+                className="hidden" 
+                ref={fileInputRef}
+                onChange={handleImportCSV}
+              />
+              <Button 
+                onClick={() => fileInputRef.current?.click()} 
+                variant="outline" 
+                className="border-slate-300 text-slate-700 hover:bg-slate-50 h-9 px-3"
+                title="Importar archivo CSV"
+              >
+                <Upload className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Importar</span>
+              </Button>
+              <Button 
+                onClick={handleExportCSV} 
+                variant="outline" 
+                className="border-slate-300 text-slate-700 hover:bg-slate-50 h-9 px-3"
+              >
+                <Download className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Exportar CSV</span>
+              </Button>
+            </div>
             
             {view === 'admin' && (
               <div className="flex gap-1 ml-auto md:ml-0">
