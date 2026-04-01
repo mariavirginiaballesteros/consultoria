@@ -5,7 +5,7 @@ import { ActivityRecord, TYPE_LABELS } from "@/lib/consulting-data";
 
 interface AdminTableProps {
   records: ActivityRecord[];
-  onDelete: (id: number) => void;
+  onDelete: (id: string) => void;
 }
 
 export function AdminTable({ records, onDelete }: AdminTableProps) {

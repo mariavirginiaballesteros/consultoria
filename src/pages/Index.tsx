@@ -1,299 +1,152 @@
-import { useState, useEffect, useRef } from "react";
-import { Download, AlertCircle, Pencil, Trash2, RotateCcw, Upload } from "lucide-react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { INITIAL_RECORDS, ActivityRecord, TYPE_LABELS } from "@/lib/consulting-data";
-import { MetricsCards } from "@/components/consulting/MetricsCards";
-import { AdminForm } from "@/components/consulting/AdminForm";
-import { AdminTable } from "@/components/consulting/AdminTable";
-import { ClientOverview } from "@/components/consulting/ClientOverview";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Building2, Plus, ArrowRight, Trash2, Copy, DatabaseZap } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
 
 export default function Index() {
-  const [view, setView] = useState<'admin' | 'cliente'>('admin');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  // Cargar datos de localStorage o usar los iniciales
-  const [records, setRecords] = useState<ActivityRecord[]>(() => {
-    const savedRecords = localStorage.getItem("consulting-records");
-    if (savedRecords) {
-      try {
-        return JSON.parse(savedRecords);
-      } catch (e) {
-        console.error("Error parsing saved records", e);
-      }
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [newClientName, setNewClientName] = useState("");
+
+  const { data: clients = [], isLoading, error } = useQuery({
+    queryKey: ['clients'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('clients').select('*').order('created_at', { ascending: false });
+      if (error) throw error;
+      return data;
     }
-    return INITIAL_RECORDS;
   });
 
-  const [clientName, setClientName] = useState(() => {
-    return localStorage.getItem("consulting-client-name") || "Consultoría Bancaria";
+  const createClient = useMutation({
+    mutationFn: async (name: string) => {
+      const { data, error } = await supabase.from('clients').insert([{ name }]).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      setNewClientName("");
+      showSuccess("Cliente creado con éxito");
+      navigate(`/admin/${data.id}`);
+    },
+    onError: (err) => {
+      console.error(err);
+      showError("Error al crear cliente. ¿Ejecutaste el script SQL en Supabase?");
+    }
   });
-  
-  const [isEditingName, setIsEditingName] = useState(false);
 
-  // Guardar en localStorage cada vez que cambian los registros
-  useEffect(() => {
-    localStorage.setItem("consulting-records", JSON.stringify(records));
-  }, [records]);
-
-  useEffect(() => {
-    localStorage.setItem("consulting-client-name", clientName);
-  }, [clientName]);
-
-  const handleAddRecord = (data: Omit<ActivityRecord, 'id'>) => {
-    const newRecord: ActivityRecord = {
-      ...data,
-      id: records.length > 0 ? Math.max(...records.map(r => r.id)) + 1 : 1,
-    };
-    setRecords([...records, newRecord]);
-  };
-
-  const handleDeleteRecord = (id: number) => {
-    if (window.confirm("¿Estás seguro de que deseas eliminar esta actividad?")) {
-      setRecords(records.filter(r => r.id !== id));
-      showSuccess("Actividad eliminada");
+  const deleteClient = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('clients').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      showSuccess("Cliente eliminado");
     }
+  });
+
+  const handleCreate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newClientName.trim()) return;
+    createClient.mutate(newClientName.trim());
   };
 
-  const handleClearAllData = () => {
-    if (window.confirm("🚨 ¿ESTÁS SEGURO? Esto borrará TODOS los registros permanentemente y dejará la tabla en blanco. No se puede deshacer.")) {
-      setRecords([]);
-      showSuccess("Todos los datos han sido borrados");
-    }
+  const copyLink = (clientId: string) => {
+    const url = `${window.location.origin}/client/${clientId}`;
+    navigator.clipboard.writeText(url);
+    showSuccess("Enlace de cliente copiado al portapapeles");
   };
-
-  const handleLoadDemo = () => {
-    if (window.confirm("¿Reemplazar los datos actuales con los de la captura de pantalla de ejemplo?")) {
-      setRecords(INITIAL_RECORDS);
-      showSuccess("Datos de ejemplo cargados");
-    }
-  };
-
-  const handleExportCSV = () => {
-    const rows = [['Fecha', 'Tipo', 'Área', 'Horas', 'Impacto', 'Oportunidad No Cubierta', 'Notas']];
-    records.forEach(r => {
-      rows.push([
-        r.date, TYPE_LABELS[r.type] || r.type, r.area, r.hours.toString(),
-        r.impact, r.opportunity ? 'Sí' : 'No', r.notes
-      ]);
-    });
-    const csvContent = rows.map(e => e.map(cell => `"${cell}"`).join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `reporte-${clientName.toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-  };
-
-  const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      if (!text) return;
-
-      const lines = text.split('\n');
-      const newRecords: ActivityRecord[] = [];
-      let maxId = records.length > 0 ? Math.max(...records.map(r => r.id)) : 0;
-
-      // Empezar desde 1 para saltar la fila de encabezados
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
-
-        // Parseador básico de CSV que respeta las comillas dobles
-        const cols = [];
-        let insideQuote = false;
-        let currentStr = "";
-        for (let j = 0; j < line.length; j++) {
-          if (line[j] === '"') {
-            insideQuote = !insideQuote;
-          } else if (line[j] === ',' && !insideQuote) {
-            cols.push(currentStr);
-            currentStr = "";
-          } else {
-            currentStr += line[j];
-          }
-        }
-        cols.push(currentStr);
-
-        // Validar si tiene suficientes columnas para ser un registro válido
-        if (cols.length >= 4 && cols[0]) {
-          maxId++;
-          
-          // Detectar el tipo de actividad
-          const typeStr = (cols[1] || '').toLowerCase();
-          const typeMap = typeStr.includes('reunión') ? 'reunion' : typeStr.includes('reporte') ? 'reporte' : 'trabajo';
-
-          newRecords.push({
-            id: maxId,
-            date: cols[0],
-            type: typeMap,
-            area: cols[2] || 'Otros',
-            hours: parseFloat(cols[3]) || 0,
-            impact: cols[4] || '',
-            opportunity: (cols[5] || '').toLowerCase() === 'sí' || (cols[5] || '').toLowerCase() === 'si',
-            notes: cols[6] || ''
-          });
-        }
-      }
-
-      if (newRecords.length > 0) {
-        setRecords(prev => [...prev, ...newRecords]);
-        showSuccess(`Se importaron ${newRecords.length} actividades correctamente`);
-      } else {
-        showError("No se encontraron registros válidos en el archivo");
-      }
-    };
-    reader.readAsText(file);
-    
-    // Resetear el input file para permitir cargar el mismo archivo nuevamente si es necesario
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
-  const opportunities = records.filter(r => r.opportunity);
-  
-  // Format current month and year nicely
-  const dateStr = new Date().toLocaleString('es-ES', { month: 'long', year: 'numeric' });
-  const formattedDate = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
 
   return (
-    <div className="min-h-screen bg-[#f5f5f5] text-slate-900 pb-12 font-sans selection:bg-blue-200">
-      <div className="max-w-[1200px] mx-auto px-4 pt-8">
+    <div className="min-h-screen bg-[#f5f5f5] text-slate-900 py-12 font-sans">
+      <div className="max-w-[800px] mx-auto px-4">
         
-        {/* Header */}
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-5 md:p-6 rounded-lg shadow-sm border border-slate-200 mb-8 gap-4 transition-all">
-          
-          <div className="flex items-center gap-2 w-full md:w-auto">
-            <span className="text-xl md:text-2xl font-semibold text-blue-600">🏦</span>
-            {isEditingName ? (
-              <Input
-                value={clientName}
-                onChange={(e) => setClientName(e.target.value)}
-                onBlur={() => setIsEditingName(false)}
-                onKeyDown={(e) => e.key === 'Enter' && setIsEditingName(false)}
-                className="text-lg md:text-xl font-semibold text-blue-600 h-9 w-[200px] md:w-[250px] border-blue-200 focus-visible:ring-blue-500 px-2"
-                autoFocus
-              />
-            ) : (
-              <h1 
-                className="text-xl md:text-2xl font-semibold text-blue-600 flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity group"
-                onClick={() => setIsEditingName(true)}
-                title="Click para editar nombre"
-              >
-                {clientName}
-                <Pencil className="h-4 w-4 text-slate-300 group-hover:text-blue-500 transition-colors" />
-              </h1>
-            )}
-            <span className="text-xl md:text-2xl font-semibold text-blue-600 hidden md:inline-block">- {formattedDate}</span>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto mt-2 md:mt-0">
-            <div className="flex bg-slate-100 p-1 rounded-md">
-              <button
-                onClick={() => setView('admin')}
-                className={`flex-1 sm:flex-none px-4 py-1.5 text-sm rounded-sm font-medium transition-all ${view === 'admin' ? 'bg-blue-600 shadow-sm text-white' : 'text-slate-600 hover:text-slate-900'}`}
-              >
-                Admin
-              </button>
-              <button
-                onClick={() => setView('cliente')}
-                className={`flex-1 sm:flex-none px-4 py-1.5 text-sm rounded-sm font-medium transition-all ${view === 'cliente' ? 'bg-blue-600 shadow-sm text-white' : 'text-slate-600 hover:text-slate-900'}`}
-              >
-                Cliente
-              </button>
-            </div>
-            
-            <div className="flex gap-2">
-              <input 
-                type="file" 
-                accept=".csv" 
-                className="hidden" 
-                ref={fileInputRef}
-                onChange={handleImportCSV}
-              />
-              <Button 
-                onClick={() => fileInputRef.current?.click()} 
-                variant="outline" 
-                className="border-slate-300 text-slate-700 hover:bg-slate-50 h-9 px-3"
-                title="Importar archivo CSV"
-              >
-                <Upload className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Importar</span>
-              </Button>
-              <Button 
-                onClick={handleExportCSV} 
-                variant="outline" 
-                className="border-slate-300 text-slate-700 hover:bg-slate-50 h-9 px-3"
-              >
-                <Download className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Exportar CSV</span>
-              </Button>
-            </div>
-            
-            {view === 'admin' && (
-              <div className="flex gap-1 ml-auto md:ml-0">
-                <Button 
-                  onClick={handleLoadDemo} 
-                  variant="ghost" 
-                  className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 h-9 px-2"
-                  title="Cargar datos de ejemplo (captura)"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                </Button>
-                <Button 
-                  onClick={handleClearAllData} 
-                  variant="ghost" 
-                  className="text-red-500 hover:text-red-700 hover:bg-red-50 h-9 px-2"
-                  title="Vaciar toda la tabla"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
-          </div>
+        <header className="mb-10 text-center">
+          <h1 className="text-3xl font-bold text-slate-900 flex items-center justify-center gap-3 mb-2">
+            <Building2 className="h-8 w-8 text-blue-600" />
+            Portal de Consultoría
+          </h1>
+          <p className="text-slate-500">Administra tus clientes y horas de servicio</p>
         </header>
 
-        {/* Common Metrics */}
-        <MetricsCards records={records} isClientView={view === 'cliente'} />
-
-        {/* View Content */}
-        <div className="transition-all duration-300">
-          {view === 'admin' ? (
-            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <AdminForm onAdd={handleAddRecord} />
-              <AdminTable records={records} onDelete={handleDeleteRecord} />
-
-              {opportunities.length > 0 && (
-                <div className="bg-white border-2 border-amber-500/80 rounded-lg p-5 mb-8 shadow-sm">
-                  <h2 className="text-amber-600 font-semibold text-sm mb-3 flex items-center gap-2">
-                    ⚠️ Oportunidades no cubiertas
-                  </h2>
-                  <div className="space-y-0 mb-3">
-                    {opportunities.map(opp => (
-                      <div key={opp.id} className="py-2 border-b border-slate-100 last:border-0 text-xs text-slate-600">
-                        <strong className="block text-slate-900 mb-1 text-sm">{opp.area}</strong>
-                        {opp.impact}
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-xs text-slate-500 italic mt-3">
-                    💡 Estos temas podrían evolucionar a servicios adicionales o expansión de horas.
+        {error && (
+          <Card className="mb-8 border-red-200 bg-red-50">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-4">
+                <DatabaseZap className="h-6 w-6 text-red-600 shrink-0" />
+                <div>
+                  <h3 className="font-semibold text-red-900 mb-1">Falta configurar la Base de Datos</h3>
+                  <p className="text-sm text-red-800 mb-3">
+                    Parece que las tablas en Supabase aún no existen. Por favor, ve a tu proyecto en Supabase, abre el "SQL Editor" y ejecuta el script de configuración.
                   </p>
                 </div>
-              )}
-            </div>
-          ) : (
-            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <ClientOverview records={records} />
-            </div>
-          )}
-        </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <Card className="mb-8 shadow-sm border-slate-200">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg">Agregar nuevo cliente</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleCreate} className="flex gap-3">
+              <Input 
+                placeholder="Nombre de la empresa o cliente..." 
+                value={newClientName}
+                onChange={(e) => setNewClientName(e.target.value)}
+                className="flex-1"
+                disabled={createClient.isPending}
+              />
+              <Button type="submit" disabled={!newClientName.trim() || createClient.isPending} className="bg-blue-600 hover:bg-blue-700 text-white">
+                <Plus className="h-4 w-4 mr-2" />
+                Crear
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <h2 className="text-lg font-semibold mb-4 text-slate-800">Tus Clientes Activos</h2>
+        
+        {isLoading ? (
+          <div className="text-center py-10 text-slate-500">Cargando clientes...</div>
+        ) : clients.length === 0 && !error ? (
+           <div className="text-center py-10 bg-white rounded-lg border border-dashed border-slate-300 text-slate-500">
+             No tienes clientes todavía. Crea el primero arriba.
+           </div>
+        ) : (
+          <div className="grid gap-4">
+            {clients.map(client => (
+              <Card key={client.id} className="shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="font-semibold text-lg text-slate-900">
+                    {client.name}
+                  </div>
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <Button variant="outline" size="sm" onClick={() => copyLink(client.id)} className="flex-1 sm:flex-none" title="Copiar enlace para el cliente">
+                      <Copy className="h-4 w-4 mr-2" />
+                      Link
+                    </Button>
+                    <Button onClick={() => navigate(`/admin/${client.id}`)} size="sm" className="flex-1 sm:flex-none bg-slate-900 text-white hover:bg-slate-800">
+                      Gestionar <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => {
+                      if(window.confirm('¿Borrar este cliente y TODAS sus actividades?')) deleteClient.mutate(client.id);
+                    }} className="text-red-500 hover:text-red-700 hover:bg-red-50 px-2">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
