@@ -1,20 +1,21 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Trash2, Check, Users, Zap, FileText } from "lucide-react";
-import { ActivityRecord, TYPE_LABELS } from "@/lib/consulting-data";
+import { Trash2, Check, Users, Zap, FileText, CheckCircle2 } from "lucide-react";
+import { ActivityRecord } from "@/lib/consulting-data";
 
 interface AdminTableProps {
   records: ActivityRecord[];
   onDelete: (id: string) => void;
+  typeLabels: Record<string, string>;
 }
 
-export function AdminTable({ records, onDelete }: AdminTableProps) {
+export function AdminTable({ records, onDelete, typeLabels }: AdminTableProps) {
   const getTypeIcon = (type: string) => {
     switch (type) {
       case 'reunion': return <Users className="h-4 w-4 mr-2 text-[#62BAD3]" />;
       case 'trabajo': return <Zap className="h-4 w-4 mr-2 text-[#D9E021]" />;
       case 'reporte': return <FileText className="h-4 w-4 mr-2 text-[#E32462]" />;
-      default: return null;
+      default: return <CheckCircle2 className="h-4 w-4 mr-2 text-slate-400" />;
     }
   };
 
@@ -46,7 +47,7 @@ export function AdminTable({ records, onDelete }: AdminTableProps) {
                 <TableCell className="text-xs whitespace-nowrap">
                   <div className="flex items-center font-medium text-slate-700">
                     {getTypeIcon(r.type)}
-                    {TYPE_LABELS[r.type]}
+                    {typeLabels[r.type] || r.type}
                   </div>
                 </TableCell>
                 <TableCell className="text-xs text-slate-600">{r.area}</TableCell>

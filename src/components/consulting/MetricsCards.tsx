@@ -1,14 +1,15 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { ActivityRecord, MONTHLY_BUDGET } from "@/lib/consulting-data";
+import { ActivityRecord } from "@/lib/consulting-data";
 
 interface MetricsCardsProps {
   records: ActivityRecord[];
   isClientView: boolean;
+  monthlyHours: number;
 }
 
-export function MetricsCards({ records, isClientView }: MetricsCardsProps) {
+export function MetricsCards({ records, isClientView, monthlyHours }: MetricsCardsProps) {
   const totalHours = records.reduce((sum, r) => sum + r.hours, 0);
-  const extraHours = Math.max(totalHours - MONTHLY_BUDGET, 0);
+  const extraHours = Math.max(totalHours - monthlyHours, 0);
   const meetingHours = records.filter(r => r.type === 'reunion').reduce((sum, r) => sum + r.hours, 0);
   const meetingCount = records.filter(r => r.type === 'reunion').length;
   const opportunities = records.filter(r => r.opportunity).length;
@@ -22,7 +23,7 @@ export function MetricsCards({ records, isClientView }: MetricsCardsProps) {
           </div>
           <div className="text-3xl font-black text-[#2A2B73]">{totalHours}h</div>
           {!isClientView && (
-            <div className="text-[11px] text-slate-400 mt-1 font-medium">vs {MONTHLY_BUDGET}h presupuesto</div>
+            <div className="text-[11px] text-slate-400 mt-1 font-medium">vs {monthlyHours}h presupuesto</div>
           )}
         </CardContent>
       </Card>
@@ -31,7 +32,7 @@ export function MetricsCards({ records, isClientView }: MetricsCardsProps) {
          <Card className="shadow-md border-slate-100 rounded-xl">
            <CardContent className="p-5">
              <div className="text-[11px] text-slate-500 uppercase tracking-wider mb-2 font-bold">Horas contratadas</div>
-             <div className="text-3xl font-black text-[#62BAD3]">{MONTHLY_BUDGET}h</div>
+             <div className="text-3xl font-black text-[#62BAD3]">{monthlyHours}h</div>
            </CardContent>
          </Card>
       )}

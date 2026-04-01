@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { MetricsCards } from "@/components/consulting/MetricsCards";
 import { ClientOverview } from "@/components/consulting/ClientOverview";
-import { ActivityRecord } from "@/lib/consulting-data";
+import { ActivityRecord, MONTHLY_BUDGET, DEFAULT_TYPES } from "@/lib/consulting-data";
 import { Loader2, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { JengibreFooter } from "@/components/JengibreFooter";
@@ -44,22 +44,19 @@ export default function ClientView() {
 
     setIsGeneratingPdf(true);
 
-    // 1. Desactivamos el límite de altura y scroll temporalmente para ver todo
     if (listContainer) {
       listContainer.style.maxHeight = "none";
       listContainer.style.overflow = "visible";
     }
 
-    // 2. Damos un pequeño respiro para que el navegador recalcule el alto total de la página
     await new Promise(resolve => setTimeout(resolve, 100));
 
     try {
-      // 3. Tomamos la "fotografía" con toda la página desplegada
       const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,
         logging: false,
-        backgroundColor: "#F4F5F8", // Fondo de la marca
+        backgroundColor: "#F4F5F8",
       });
 
       const imgData = canvas.toDataURL("image/png");
@@ -76,11 +73,9 @@ export default function ClientView() {
       let heightLeft = pdfHeight;
       let position = 0;
 
-      // Primera página
       pdf.addImage(imgData, "PNG", 0, position, pdfWidth, pdfHeight);
       heightLeft -= pageHeight;
 
-      // Si el contenido es más largo que una página A4, agregamos más páginas
       while (heightLeft > 0) {
         position = heightLeft - pdfHeight;
         pdf.addPage();
@@ -94,7 +89,6 @@ export default function ClientView() {
       console.error(error);
       showError("Hubo un error al generar el PDF");
     } finally {
-      // 4. Volvemos a poner el scroll en su estado normal
       if (listContainer) {
         listContainer.style.maxHeight = "";
         listContainer.style.overflow = "";
@@ -118,10 +112,13 @@ export default function ClientView() {
   const dateStr = new Date().toLocaleString('es-ES', { month: 'long', year: 'numeric' });
   const formattedDate = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
 
+  const clientHours = client.monthly_hours ?? MONTHLY_BUDGET;
+  const clientTypes = client.activity_types ?? DEFAULT_TYPES;
+  const typeLabelsMap = clientTypes.reduce((acc: any, t: any) => ({...acc, [t.value]: t.label}), {});
+
   return (
     <div className="min-h-screen bg-[#F4F5F8] text-slate-900 flex flex-col font-sans selection:bg-[#62BAD3]/30">
       
-      {/* Botón flotante para descargar PDF (no se renderiza dentro del PDF gracias a data-html2canvas-ignore) */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2" data-html2canvas-ignore>
         <Button 
           onClick={generatePDF} 
@@ -137,7 +134,6 @@ export default function ClientView() {
         </Button>
       </div>
 
-      {/* Contenedor principal que será capturado para el PDF */}
       <div id="pdf-content" className="max-w-[1200px] mx-auto px-4 pt-8 flex-1 w-full bg-[#F4F5F8] pb-10">
         
         <header className="relative flex flex-col md:flex-row justify-between items-start md:items-center bg-[#2A2B73] p-6 md:p-8 rounded-2xl shadow-xl border-b-4 border-[#D9E021] mb-8 gap-4 overflow-hidden">
@@ -162,10 +158,10 @@ export default function ClientView() {
           </div>
         </header>
 
-        <MetricsCards records={records} isClientView={true} />
+        <MetricsCards records={records} isClientView={true} monthlyHours={clientHours} />
 
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <ClientOverview records={records} />
+          <ClientOverview records={records} monthlyHours={clientHours} typeLabels={typeLabelsMap} />
         </div>
 
         <div className="mt-8 pt-8">

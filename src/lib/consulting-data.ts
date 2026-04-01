@@ -1,10 +1,8 @@
-export type ActivityType = 'reunion' | 'trabajo' | 'reporte';
-
 export interface ActivityRecord {
   id: string;
   client_id?: string;
   date: string;
-  type: ActivityType;
+  type: string;
   area: string;
   hours: number;
   impact: string;
@@ -15,11 +13,11 @@ export interface ActivityRecord {
 
 export const MONTHLY_BUDGET = 20;
 
-export const TYPE_LABELS: Record<ActivityType, string> = {
-  reunion: 'Reunión',
-  trabajo: 'Trabajo / Análisis',
-  reporte: 'Reporte'
-};
+export const DEFAULT_TYPES = [
+  { value: 'reunion', label: 'Reunión' },
+  { value: 'trabajo', label: 'Trabajo / Análisis' },
+  { value: 'reporte', label: 'Reporte' }
+];
 
 export const AREAS = [
   'Comunicación Interna',

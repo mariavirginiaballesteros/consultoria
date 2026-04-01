@@ -8,7 +8,7 @@ import { MetricsCards } from "@/components/consulting/MetricsCards";
 import { AdminForm } from "@/components/consulting/AdminForm";
 import { AdminTable } from "@/components/consulting/AdminTable";
 import { showSuccess, showError } from "@/utils/toast";
-import { ActivityRecord, TYPE_LABELS } from "@/lib/consulting-data";
+import { ActivityRecord, MONTHLY_BUDGET, AREAS, DEFAULT_TYPES } from "@/lib/consulting-data";
 import { JengibreFooter } from "@/components/JengibreFooter";
 import logoUrl from "@/assets/logo.jpg";
 
@@ -60,10 +60,11 @@ export default function ClientAdmin() {
   });
 
   const handleExportCSV = () => {
+    const typeLabelsMap = clientTypes.reduce((acc: any, t: any) => ({...acc, [t.value]: t.label}), {});
     const rows = [['Fecha', 'Tipo', 'Área', 'Horas', 'Impacto', 'Oportunidad No Cubierta', 'Notas']];
     records.forEach(r => {
       rows.push([
-        r.date, TYPE_LABELS[r.type] || r.type, r.area, r.hours.toString(),
+        r.date, typeLabelsMap[r.type] || r.type, r.area, r.hours.toString(),
         r.impact, r.opportunity ? 'Sí' : 'No', r.notes
       ]);
     });
@@ -76,6 +77,7 @@ export default function ClientAdmin() {
   };
 
   const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    // ... logic remains identical
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -90,19 +92,13 @@ export default function ClientAdmin() {
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim();
         if (!line) continue;
-
         const cols = [];
         let insideQuote = false;
         let currentStr = "";
         for (let j = 0; j < line.length; j++) {
-          if (line[j] === '"') {
-            insideQuote = !insideQuote;
-          } else if (line[j] === ',' && !insideQuote) {
-            cols.push(currentStr);
-            currentStr = "";
-          } else {
-            currentStr += line[j];
-          }
+          if (line[j] === '"') insideQuote = !insideQuote;
+          else if (line[j] === ',' && !insideQuote) { cols.push(currentStr); currentStr = ""; }
+          else currentStr += line[j];
         }
         cols.push(currentStr);
 
@@ -128,9 +124,7 @@ export default function ClientAdmin() {
         if (!error) {
           queryClient.invalidateQueries({ queryKey: ['activities', clientId] });
           showSuccess(`Se importaron ${newRecords.length} actividades correctamente`);
-        } else {
-          showError("Error guardando en la base de datos");
-        }
+        } else showError("Error guardando en la base de datos");
       }
     };
     reader.readAsText(file);
@@ -145,6 +139,12 @@ export default function ClientAdmin() {
 
   if (clientLoading) return <div className="min-h-screen p-10 text-center font-medium">Cargando...</div>;
   if (!client) return <div className="min-h-screen p-10 text-center font-medium">Cliente no encontrado</div>;
+
+  // Extraemos variables dinámicas del cliente (o usamos default como fallback)
+  const clientHours = client.monthly_hours ?? MONTHLY_BUDGET;
+  const clientAreas = client.areas ?? AREAS;
+  const clientTypes = client.activity_types ?? DEFAULT_TYPES;
+  const typeLabelsMap = clientTypes.reduce((acc: any, t: any) => ({...acc, [t.value]: t.label}), {});
 
   const opportunities = records.filter(r => r.opportunity);
 
@@ -184,13 +184,13 @@ export default function ClientAdmin() {
           </div>
         </header>
 
-        <MetricsCards records={records} isClientView={false} />
+        <MetricsCards records={records} isClientView={false} monthlyHours={clientHours} />
 
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <AdminForm onAdd={(data) => addRecord.mutate(data)} />
+          <AdminForm onAdd={(data) => addRecord.mutate(data)} areas={clientAreas} activityTypes={clientTypes} />
           <AdminTable records={records} onDelete={(id) => {
             if(window.confirm("¿Seguro que deseas borrar esto?")) deleteRecord.mutate(id);
-          }} />
+          }} typeLabels={typeLabelsMap} />
 
           {opportunities.length > 0 && (
             <div className="bg-white border-2 border-[#E32462]/30 rounded-xl p-6 mb-8 shadow-sm relative overflow-hidden">

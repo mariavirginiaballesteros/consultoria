@@ -4,15 +4,16 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { ActivityType, AREAS } from "@/lib/consulting-data";
 import { showSuccess, showError } from "@/utils/toast";
 import { Zap } from "lucide-react";
 
 interface AdminFormProps {
   onAdd: (record: any) => void;
+  areas: string[];
+  activityTypes: { value: string; label: string }[];
 }
 
-export function AdminForm({ onAdd }: AdminFormProps) {
+export function AdminForm({ onAdd, areas, activityTypes }: AdminFormProps) {
   const getLocalDate = () => {
     const d = new Date();
     d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
@@ -20,8 +21,8 @@ export function AdminForm({ onAdd }: AdminFormProps) {
   };
 
   const [date, setDate] = useState(getLocalDate());
-  const [type, setType] = useState<ActivityType>('reunion');
-  const [area, setArea] = useState(AREAS[0]);
+  const [type, setType] = useState(activityTypes[0]?.value || '');
+  const [area, setArea] = useState(areas[0] || '');
   const [hours, setHours] = useState("1");
   const [impact, setImpact] = useState("");
   const [notes, setNotes] = useState("");
@@ -32,8 +33,8 @@ export function AdminForm({ onAdd }: AdminFormProps) {
       showError("Por favor, describe el impacto");
       return;
     }
-    if (!date) {
-      showError("Por favor, selecciona una fecha");
+    if (!date || !type || !area) {
+      showError("Faltan campos obligatorios");
       return;
     }
 
@@ -47,8 +48,8 @@ export function AdminForm({ onAdd }: AdminFormProps) {
       opportunity
     });
 
-    setType('reunion');
-    setArea(AREAS[0]);
+    setType(activityTypes[0]?.value || '');
+    setArea(areas[0] || '');
     setHours("1");
     setImpact("");
     setNotes("");
@@ -72,16 +73,14 @@ export function AdminForm({ onAdd }: AdminFormProps) {
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Tipo</Label>
-          <select className={selectClass} value={type} onChange={e => setType(e.target.value as ActivityType)}>
-            <option value="reunion">Reunión</option>
-            <option value="trabajo">Trabajo / Análisis</option>
-            <option value="reporte">Reporte</option>
+          <select className={selectClass} value={type} onChange={e => setType(e.target.value)}>
+            {activityTypes.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Área</Label>
           <select className={selectClass} value={area} onChange={e => setArea(e.target.value)}>
-            {AREAS.map(a => <option key={a} value={a}>{a}</option>)}
+            {areas.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
         </div>
         <div className="space-y-1.5">

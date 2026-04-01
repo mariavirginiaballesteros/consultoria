@@ -4,16 +4,28 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, ArrowRight, Trash2, Copy, DatabaseZap } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Plus, ArrowRight, Trash2, Copy, DatabaseZap, X } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
 import { JengibreFooter } from "@/components/JengibreFooter";
+import { AREAS, DEFAULT_TYPES } from "@/lib/consulting-data";
 import logoUrl from "@/assets/logo.jpg";
 
 export default function Index() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [newClientName, setNewClientName] = useState("");
+  
+  // Dialog State
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [monthlyHours, setMonthlyHours] = useState(20);
+  const [areas, setAreas] = useState<string[]>(AREAS);
+  const [types, setTypes] = useState(DEFAULT_TYPES);
+  
+  const [newArea, setNewArea] = useState("");
+  const [newType, setNewType] = useState("");
 
   const { data: clients = [], isLoading, error } = useQuery({
     queryKey: ['clients'],
@@ -25,22 +37,30 @@ export default function Index() {
   });
 
   const createClient = useMutation({
-    mutationFn: async (name: string) => {
-      const { data, error } = await supabase.from('clients').insert([{ name }]).select().single();
+    mutationFn: async (clientData: any) => {
+      const { data, error } = await supabase.from('clients').insert([clientData]).select().single();
       if (error) throw error;
       return data;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
-      setNewClientName("");
+      setIsDialogOpen(false);
+      resetForm();
       showSuccess("Cliente creado con éxito");
       navigate(`/admin/${data.id}`);
     },
     onError: (err) => {
       console.error(err);
-      showError("Error al crear cliente.");
+      showError("Error al crear cliente. ¿Actualizaste la base de datos?");
     }
   });
+
+  const resetForm = () => {
+    setName("");
+    setMonthlyHours(20);
+    setAreas(AREAS);
+    setTypes(DEFAULT_TYPES);
+  };
 
   const deleteClient = useMutation({
     mutationFn: async (id: string) => {
@@ -53,16 +73,42 @@ export default function Index() {
     }
   });
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = () => {
+    if (!name.trim()) {
+      showError("El nombre es obligatorio");
+      return;
+    }
+    createClient.mutate({
+      name: name.trim(),
+      monthly_hours: monthlyHours,
+      areas: areas,
+      activity_types: types
+    });
+  };
+
+  const addArea = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newClientName.trim()) return;
-    createClient.mutate(newClientName.trim());
+    if (newArea.trim() && !areas.includes(newArea.trim())) {
+      setAreas([...areas, newArea.trim()]);
+      setNewArea("");
+    }
+  };
+
+  const addType = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newType.trim()) {
+      const value = newType.trim().toLowerCase().replace(/\s+/g, '_');
+      if (!types.find(t => t.value === value)) {
+        setTypes([...types, { value, label: newType.trim() }]);
+        setNewType("");
+      }
+    }
   };
 
   const copyLink = (clientId: string) => {
     const url = `${window.location.origin}/client/${clientId}`;
     navigator.clipboard.writeText(url);
-    showSuccess("Enlace de cliente copiado al portapapeles");
+    showSuccess("Enlace copiado al portapapeles");
   };
 
   return (
@@ -72,7 +118,6 @@ export default function Index() {
         <header className="mb-10 text-center bg-[#2A2B73] p-10 rounded-3xl shadow-xl relative overflow-hidden border-b-4 border-[#D9E021]">
           <div className="absolute -top-32 -right-32 w-80 h-80 bg-[#E32462] rounded-full blur-[80px] opacity-30"></div>
           <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-[#62BAD3] rounded-full blur-[80px] opacity-30"></div>
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
           
           <div className="relative z-10 flex flex-col items-center">
             <img src={logoUrl} alt="Jengibre Logo" className="h-24 w-24 rounded-2xl shadow-xl object-cover border-4 border-[#D9E021] mb-5" />
@@ -91,7 +136,7 @@ export default function Index() {
                 <div>
                   <h3 className="font-bold text-[#2A2B73] mb-1">Falta configurar la Base de Datos</h3>
                   <p className="text-sm text-slate-700">
-                    Ejecuta el script SQL en Supabase para crear las tablas.
+                    Asegúrate de ejecutar el código SQL para agregar las nuevas columnas a la tabla clients.
                   </p>
                 </div>
               </div>
@@ -99,45 +144,87 @@ export default function Index() {
           </Card>
         )}
 
-        <Card className="mb-10 shadow-md border-slate-100 rounded-xl bg-white">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-lg font-bold text-[#2A2B73]">Agregar nuevo cliente</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleCreate} className="flex flex-col sm:flex-row gap-3">
-              <Input 
-                placeholder="Nombre de la empresa o cliente..." 
-                value={newClientName}
-                onChange={(e) => setNewClientName(e.target.value)}
-                className="flex-1 h-12 text-base focus-visible:ring-[#62BAD3]"
-                disabled={createClient.isPending}
-              />
-              <Button type="submit" disabled={!newClientName.trim() || createClient.isPending} className="h-12 px-8 bg-[#D9E021] hover:bg-[#c6cc1b] text-[#2A2B73] font-bold">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-bold text-[#2A2B73]">Tus Clientes Activos</h2>
+          
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-[#D9E021] hover:bg-[#c6cc1b] text-[#2A2B73] font-bold shadow-md">
                 <Plus className="h-5 w-5 mr-2" />
-                Crear Perfil
+                Nuevo Cliente
               </Button>
-            </form>
-          </CardContent>
-        </Card>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-black text-[#2A2B73]">Configurar Cliente</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-6 py-4">
+                
+                <div className="space-y-2">
+                  <Label className="font-bold text-slate-600">Nombre de la Empresa</Label>
+                  <Input value={name} onChange={e => setName(e.target.value)} placeholder="Ej: Acme Corp" className="h-12 text-base" />
+                </div>
 
-        <h2 className="text-xl font-bold mb-5 text-[#2A2B73]">Tus Clientes Activos</h2>
+                <div className="space-y-2">
+                  <Label className="font-bold text-slate-600">Horas mensuales contratadas</Label>
+                  <Input type="number" min="1" value={monthlyHours} onChange={e => setMonthlyHours(Number(e.target.value))} className="h-12 text-base" />
+                </div>
+
+                <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                  <Label className="font-bold text-slate-600">Áreas de Trabajo Personalizadas</Label>
+                  <div className="flex gap-2">
+                    <Input value={newArea} onChange={e => setNewArea(e.target.value)} onKeyDown={e => e.key === 'Enter' && addArea(e)} placeholder="Nueva área..." className="bg-white" />
+                    <Button onClick={addArea} type="button" variant="outline" className="bg-white">Agregar</Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {areas.map(a => (
+                      <span key={a} className="bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-sm flex items-center gap-2 shadow-sm font-medium">
+                        {a} <button type="button" onClick={() => setAreas(areas.filter(x => x !== a))}><X className="h-3 w-3 hover:text-[#E32462]"/></button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                  <Label className="font-bold text-slate-600">Tipos de Actividad</Label>
+                  <div className="flex gap-2">
+                    <Input value={newType} onChange={e => setNewType(e.target.value)} onKeyDown={e => e.key === 'Enter' && addType(e)} placeholder="Nuevo tipo..." className="bg-white" />
+                    <Button onClick={addType} type="button" variant="outline" className="bg-white">Agregar</Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {types.map(t => (
+                      <span key={t.value} className="bg-[#62BAD3]/10 border border-[#62BAD3]/20 text-[#2A2B73] px-3 py-1.5 rounded-full text-sm flex items-center gap-2 shadow-sm font-medium">
+                        {t.label} <button type="button" onClick={() => setTypes(types.filter(x => x.value !== t.value))}><X className="h-3 w-3 hover:text-[#E32462]"/></button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <Button onClick={handleCreate} disabled={createClient.isPending} className="w-full h-12 bg-[#D9E021] text-[#2A2B73] font-bold hover:bg-[#c6cc1b] text-base shadow-md">
+                  {createClient.isPending ? "Guardando..." : "Crear e Iniciar"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
         
         {isLoading ? (
           <div className="text-center py-10 text-slate-500 font-medium">Cargando clientes...</div>
         ) : clients.length === 0 && !error ? (
            <div className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-slate-200 text-slate-500 font-medium">
-             No tienes clientes todavía. Crea el primero arriba.
+             No tienes clientes todavía.
            </div>
         ) : (
           <div className="grid gap-4">
             {clients.map(client => (
               <Card key={client.id} className="shadow-sm hover:shadow-md transition-all border-slate-200 rounded-xl">
                 <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div className="font-bold text-lg text-[#2A2B73]">
-                    {client.name}
+                  <div className="flex flex-col">
+                    <span className="font-bold text-lg text-[#2A2B73]">{client.name}</span>
+                    {client.monthly_hours && <span className="text-xs text-slate-500 font-medium">{client.monthly_hours}h mensuales asignadas</span>}
                   </div>
                   <div className="flex items-center gap-2 w-full sm:w-auto">
-                    <Button variant="outline" size="sm" onClick={() => copyLink(client.id)} className="flex-1 sm:flex-none border-slate-200 hover:bg-[#62BAD3]/10 hover:text-[#62BAD3]" title="Copiar enlace para el cliente">
+                    <Button variant="outline" size="sm" onClick={() => copyLink(client.id)} className="flex-1 sm:flex-none border-slate-200 hover:bg-[#62BAD3]/10 hover:text-[#62BAD3]" title="Copiar enlace">
                       <Copy className="h-4 w-4 mr-2" />
                       Link
                     </Button>

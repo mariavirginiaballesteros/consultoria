@@ -1,12 +1,18 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { ActivityRecord, MONTHLY_BUDGET, TYPE_LABELS } from "@/lib/consulting-data";
-import { Users, Zap, FileText } from "lucide-react";
+import { ActivityRecord } from "@/lib/consulting-data";
+import { Users, Zap, FileText, CheckCircle2 } from "lucide-react";
 
-export function ClientOverview({ records }: { records: ActivityRecord[] }) {
+interface ClientOverviewProps {
+  records: ActivityRecord[];
+  monthlyHours: number;
+  typeLabels: Record<string, string>;
+}
+
+export function ClientOverview({ records, monthlyHours, typeLabels }: ClientOverviewProps) {
   const totalHours = records.reduce((sum, r) => sum + r.hours, 0);
-  const percentage = Math.min((totalHours / MONTHLY_BUDGET) * 100, 100);
-  const isOverBudget = totalHours > MONTHLY_BUDGET;
+  const percentage = Math.min((totalHours / monthlyHours) * 100, 100);
+  const isOverBudget = totalHours > monthlyHours;
 
   const areas = records.reduce((acc, r) => {
     acc[r.area] = (acc[r.area] || 0) + r.hours;
@@ -18,7 +24,7 @@ export function ClientOverview({ records }: { records: ActivityRecord[] }) {
       case 'reunion': return <Users className="h-5 w-5 text-[#62BAD3]" />;
       case 'trabajo': return <Zap className="h-5 w-5 text-[#D9E021]" />;
       case 'reporte': return <FileText className="h-5 w-5 text-[#E32462]" />;
-      default: return null;
+      default: return <CheckCircle2 className="h-5 w-5 text-[#D9E021]" />;
     }
   };
 
@@ -29,7 +35,7 @@ export function ClientOverview({ records }: { records: ActivityRecord[] }) {
           <h2 className="text-sm font-bold mb-3 text-[#2A2B73] uppercase tracking-wide">Consumo mensual</h2>
           <div className="flex justify-between text-sm mb-3">
             <span className="text-slate-500 font-medium">Progreso</span>
-            <span className="font-bold text-[#2A2B73]">{totalHours}/{MONTHLY_BUDGET}h ({Math.round(percentage)}%)</span>
+            <span className="font-bold text-[#2A2B73]">{totalHours}/{monthlyHours}h ({Math.round(percentage)}%)</span>
           </div>
           <Progress 
             value={percentage} 
@@ -65,7 +71,7 @@ export function ClientOverview({ records }: { records: ActivityRecord[] }) {
                       <div className="p-1.5 bg-white rounded-md shadow-sm">
                         {getTypeIcon(r.type)}
                       </div>
-                      <strong className="text-sm text-[#2A2B73]">{TYPE_LABELS[r.type]}</strong>
+                      <strong className="text-sm text-[#2A2B73]">{typeLabels[r.type] || r.type}</strong>
                     </div>
                     <span className="text-sm font-bold text-[#2A2B73]">{r.hours}h</span>
                   </div>
