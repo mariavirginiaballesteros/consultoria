@@ -1,23 +1,20 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
 import { ActivityRecord } from "@/lib/consulting-data";
-import { Users, Zap, FileText, CheckCircle2 } from "lucide-react";
+import { Users, Zap, FileText, CheckCircle2, MessageSquare, Calendar, FolderTree } from "lucide-react";
 
 interface ClientOverviewProps {
   records: ActivityRecord[];
   monthlyHours: number;
   typeLabels: Record<string, string>;
+  onUpdateClientNote: (id: string, note: string) => void;
 }
 
-export function ClientOverview({ records, monthlyHours, typeLabels }: ClientOverviewProps) {
+export function ClientOverview({ records, monthlyHours, typeLabels, onUpdateClientNote }: ClientOverviewProps) {
   const totalHours = records.reduce((sum, r) => sum + r.hours, 0);
   const percentage = Math.min((totalHours / monthlyHours) * 100, 100);
   const isOverBudget = totalHours > monthlyHours;
-
-  const areas = records.reduce((acc, r) => {
-    acc[r.area] = (acc[r.area] || 0) + r.hours;
-    return acc;
-  }, {} as Record<string, number>);
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -44,45 +41,74 @@ export function ClientOverview({ records, monthlyHours, typeLabels }: ClientOver
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="shadow-md border-slate-100 rounded-xl">
-          <CardContent className="p-6">
-            <h2 className="text-sm font-bold mb-4 text-[#2A2B73] uppercase tracking-wide">Inversión por área</h2>
-            <div className="space-y-3">
-              {Object.entries(areas).map(([area, hours]) => (
-                <div key={area} className="flex justify-between items-center py-2 border-b last:border-0 border-slate-100 text-sm">
-                  <span className="text-slate-600 font-medium">{area}</span>
-                  <strong className="text-[#2A2B73] bg-[#62BAD3]/10 px-3 py-1 rounded-full">{Math.round(hours * 10) / 10}h</strong>
-                </div>
-              ))}
-              {Object.keys(areas).length === 0 && <div className="text-sm text-slate-400 py-2">Sin datos registrados</div>}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-md border-slate-100 rounded-xl">
-          <CardContent className="p-6">
-            <h2 className="text-sm font-bold mb-4 text-[#2A2B73] uppercase tracking-wide">Detalle de actividades</h2>
-            <div id="activity-list-container" className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
-              {records.map(r => (
-                <div key={r.id} className="p-4 bg-slate-50 rounded-lg border border-slate-100">
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1.5 bg-white rounded-md shadow-sm">
-                        {getTypeIcon(r.type)}
-                      </div>
-                      <strong className="text-sm text-[#2A2B73]">{typeLabels[r.type] || r.type}</strong>
+      <Card className="shadow-md border-slate-100 rounded-xl">
+        <CardContent className="p-6">
+          <h2 className="text-sm font-bold mb-6 text-[#2A2B73] uppercase tracking-wide">Detalle completo de actividades</h2>
+          <div id="activity-list-container" className="space-y-5">
+            {records.map(r => (
+              <div key={r.id} className="p-5 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col gap-4 transition-all hover:shadow-md">
+                
+                {/* Cabecera */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 pb-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="flex items-center text-sm font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-md">
+                      <Calendar className="h-4 w-4 mr-1.5" /> {r.date}
+                    </span>
+                    <span className="flex items-center text-sm font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-md">
+                      <FolderTree className="h-4 w-4 mr-1.5" /> {r.area}
+                    </span>
+                    <div className="flex items-center gap-1.5 text-sm text-[#2A2B73] font-bold bg-[#62BAD3]/10 px-3 py-1 rounded-md">
+                      {getTypeIcon(r.type)} {typeLabels[r.type] || r.type}
                     </div>
-                    <span className="text-sm font-bold text-[#2A2B73]">{r.hours}h</span>
                   </div>
-                  <div className="text-sm text-slate-600 leading-relaxed">{r.impact}</div>
+                  <span className="text-xl font-black text-[#2A2B73] bg-[#D9E021]/20 px-4 py-1 rounded-lg">{r.hours}h</span>
                 </div>
-              ))}
-              {records.length === 0 && <div className="text-sm text-slate-400 py-2">Sin datos registrados</div>}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+
+                {/* Contenido admin */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="text-xs font-bold uppercase text-slate-400 mb-1.5">Impacto / Entregable</h4>
+                    <p className="text-sm text-slate-700 leading-relaxed font-medium">{r.impact}</p>
+                  </div>
+                  {r.notes && (
+                    <div>
+                      <h4 className="text-xs font-bold uppercase text-slate-400 mb-1.5">Notas adicionales</h4>
+                      <p className="text-sm text-slate-600 italic bg-slate-50 p-2.5 rounded-lg border border-slate-100">{r.notes}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Observaciones cliente */}
+                <div className="mt-2 pt-4 border-t border-slate-100" data-html2canvas-ignore>
+                  <h4 className="text-xs font-bold uppercase text-[#62BAD3] mb-2.5 flex items-center gap-1.5">
+                    <MessageSquare className="h-4 w-4" /> Tus observaciones
+                  </h4>
+                  <Textarea
+                    defaultValue={r.client_notes || ''}
+                    placeholder="Escribe tus comentarios, dudas o feedback sobre esta actividad y haz clic fuera de la caja para guardar..."
+                    className="text-sm bg-slate-50/50 border-slate-200 focus:bg-white focus:border-[#62BAD3] min-h-[60px] resize-y"
+                    onBlur={(e) => {
+                      if (e.target.value !== (r.client_notes || '')) {
+                        onUpdateClientNote(r.id, e.target.value);
+                      }
+                    }}
+                  />
+                  <span className="text-[10px] text-slate-400 mt-1 block">Los cambios se guardan automáticamente al quitar el cursor de la caja.</span>
+                </div>
+                
+                {/* Notas cliente visibles en PDF */}
+                {r.client_notes && (
+                  <div className="hidden mt-2 pt-3 border-t border-slate-100" data-html2canvas-show style={{ display: 'none' }}>
+                    <h4 className="text-xs font-bold uppercase text-[#62BAD3] mb-1.5">Observaciones del cliente</h4>
+                    <p className="text-sm text-slate-700 italic bg-slate-50 p-2.5 rounded-lg border border-slate-100">{r.client_notes}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+            {records.length === 0 && <div className="text-center text-slate-400 py-10 bg-white rounded-xl border border-slate-200">No hay actividades registradas en este periodo.</div>}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

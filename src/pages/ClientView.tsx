@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MetricsCards } from "@/components/consulting/MetricsCards";
 import { ClientOverview } from "@/components/consulting/ClientOverview";
 import { ActivityRecord, MONTHLY_BUDGET, DEFAULT_TYPES, getPeriodInfo } from "@/lib/consulting-data";
@@ -15,6 +15,7 @@ import logoUrl from "@/assets/logo.jpg";
 
 export default function ClientView() {
   const { clientId } = useParams();
+  const queryClient = useQueryClient();
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [selectedPeriodId, setSelectedPeriodId] = useState<string>("");
 
@@ -30,11 +31,23 @@ export default function ClientView() {
   const { data: allRecords = [], isLoading: recordsLoading } = useQuery({
     queryKey: ['activities', clientId],
     queryFn: async () => {
-      const { data, error } = await supabase.from('activities').select('*').eq('client_id', clientId).order('created_at', { ascending: true });
+      const { data, error } = await supabase.from('activities').select('*').eq('client_id', clientId).order('date', { ascending: false });
       if (error) throw error;
       return data as ActivityRecord[];
     },
     refetchInterval: 5000 
+  });
+
+  const updateClientNote = useMutation({
+    mutationFn: async ({ id, client_notes }: { id: string, client_notes: string }) => {
+      const { error } = await supabase.from('activities').update({ client_notes }).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['activities', clientId] });
+      showSuccess("Observación guardada correctamente");
+    },
+    onError: () => showError("Hubo un error al guardar tu observación")
   });
 
   const clientStartDay = client?.period_start_day || 1;
@@ -62,6 +75,8 @@ export default function ClientView() {
   const filteredRecords = useMemo(() => {
     return allRecords.filter(r => getPeriodInfo(r.date, clientStartDay).id === selectedPeriodId);
   }, [allRecords, selectedPeriodId, clientStartDay]);
+
+  const opportunities = filteredRecords.filter(r => r.opportunity);
 
   const generatePDF = async () => {
     const element = document.getElementById("pdf-content");
@@ -194,7 +209,29 @@ export default function ClientView() {
         <MetricsCards records={filteredRecords} isClientView={true} monthlyHours={clientHours} />
 
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <ClientOverview records={filteredRecords} monthlyHours={clientHours} typeLabels={typeLabelsMap} />
+          <ClientOverview 
+            records={filteredRecords} 
+            monthlyHours={clientHours} 
+            typeLabels={typeLabelsMap}
+            onUpdateClientNote={(id, note) => updateClientNote.mutate({ id, client_notes: note })}
+          />
+
+          {opportunities.length > 0 && (
+            <div className="bg-white border-2 border-[#E32462]/30 rounded-xl p-6 mt-8 shadow-sm relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-1.5 h-full bg-[#E32462]"></div>
+              <h2 className="text-[#E32462] font-bold text-sm mb-4 flex items-center gap-2 uppercase tracking-wide">
+                🚀 Oportunidades de proyectos extra detectadas ({currentPeriodLabel})
+              </h2>
+              <div className="space-y-0 mb-2">
+                {opportunities.map(opp => (
+                  <div key={opp.id} className="py-3 border-b border-slate-100 last:border-0 text-sm text-slate-600">
+                    <strong className="block text-[#2A2B73] mb-1 font-bold">{opp.area}</strong>
+                    {opp.impact}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="mt-8 pt-8">
