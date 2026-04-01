@@ -57,7 +57,7 @@ export function ClientOverview({ records }: { records: ActivityRecord[] }) {
         <Card className="shadow-md border-slate-100 rounded-xl">
           <CardContent className="p-6">
             <h2 className="text-sm font-bold mb-4 text-[#2A2B73] uppercase tracking-wide">Detalle de actividades</h2>
-            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+            <div id="activity-list-container" className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
               {records.map(r => (
                 <div key={r.id} className="p-4 bg-slate-50 rounded-lg border border-slate-100">
                   <div className="flex justify-between items-start mb-2">

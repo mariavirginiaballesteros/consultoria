@@ -38,11 +38,23 @@ export default function ClientView() {
 
   const generatePDF = async () => {
     const element = document.getElementById("pdf-content");
+    const listContainer = document.getElementById("activity-list-container");
+    
     if (!element) return;
 
     setIsGeneratingPdf(true);
+
+    // 1. Desactivamos el límite de altura y scroll temporalmente para ver todo
+    if (listContainer) {
+      listContainer.style.maxHeight = "none";
+      listContainer.style.overflow = "visible";
+    }
+
+    // 2. Damos un pequeño respiro para que el navegador recalcule el alto total de la página
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     try {
-      // Configuramos html2canvas para alta calidad
+      // 3. Tomamos la "fotografía" con toda la página desplegada
       const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,
@@ -69,7 +81,7 @@ export default function ClientView() {
       heightLeft -= pageHeight;
 
       // Si el contenido es más largo que una página A4, agregamos más páginas
-      while (heightLeft >= 0) {
+      while (heightLeft > 0) {
         position = heightLeft - pdfHeight;
         pdf.addPage();
         pdf.addImage(imgData, "PNG", 0, position, pdfWidth, pdfHeight);
@@ -77,11 +89,16 @@ export default function ClientView() {
       }
 
       pdf.save(`Reporte_Jengibre_${client?.name.replace(/\s+/g, '_')}.pdf`);
-      showSuccess("PDF descargado correctamente");
+      showSuccess("PDF descargado correctamente con todas las tareas");
     } catch (error) {
       console.error(error);
       showError("Hubo un error al generar el PDF");
     } finally {
+      // 4. Volvemos a poner el scroll en su estado normal
+      if (listContainer) {
+        listContainer.style.maxHeight = "";
+        listContainer.style.overflow = "";
+      }
       setIsGeneratingPdf(false);
     }
   };
