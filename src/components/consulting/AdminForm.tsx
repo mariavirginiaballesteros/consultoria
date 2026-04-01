@@ -12,7 +12,14 @@ interface AdminFormProps {
 }
 
 export function AdminForm({ onAdd }: AdminFormProps) {
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  // Función para obtener la fecha local correcta evitando desfases de UTC
+  const getLocalDate = () => {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().split('T')[0];
+  };
+
+  const [date, setDate] = useState(getLocalDate());
   const [type, setType] = useState<ActivityType>('reunion');
   const [area, setArea] = useState(AREAS[0]);
   const [hours, setHours] = useState("1");
@@ -40,13 +47,14 @@ export function AdminForm({ onAdd }: AdminFormProps) {
       opportunity
     });
 
+    // Resetear formulario
     setType('reunion');
     setArea(AREAS[0]);
     setHours("1");
     setImpact("");
     setNotes("");
     setOpportunity(false);
-    setDate(new Date().toISOString().split('T')[0]);
+    setDate(getLocalDate());
     showSuccess("Actividad registrada con éxito");
   };
 

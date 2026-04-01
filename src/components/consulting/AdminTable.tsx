@@ -18,7 +18,7 @@ export function AdminTable({ records, onDelete }: AdminTableProps) {
             <TableHead>Tipo</TableHead>
             <TableHead>Área</TableHead>
             <TableHead className="text-center">Hs</TableHead>
-            <TableHead className="max-w-[200px]">Impacto</TableHead>
+            <TableHead className="max-w-[150px] sm:max-w-[250px]">Impacto</TableHead>
             <TableHead className="text-center">No cubierto</TableHead>
             <TableHead className="text-right">Acción</TableHead>
           </TableRow>
@@ -37,7 +37,7 @@ export function AdminTable({ records, onDelete }: AdminTableProps) {
                 <TableCell className="text-xs whitespace-nowrap">{TYPE_LABELS[r.type]}</TableCell>
                 <TableCell className="text-xs">{r.area}</TableCell>
                 <TableCell className="text-center font-semibold text-xs">{r.hours}h</TableCell>
-                <TableCell className="text-xs truncate max-w-[200px]" title={r.impact}>{r.impact}</TableCell>
+                <TableCell className="text-xs max-w-[150px] sm:max-w-[250px] truncate" title={r.impact}>{r.impact}</TableCell>
                 <TableCell className="text-center">
                   {r.opportunity && <Check className="h-4 w-4 mx-auto text-amber-600" />}
                 </TableCell>

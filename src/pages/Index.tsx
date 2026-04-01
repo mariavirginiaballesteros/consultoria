@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Download, AlertCircle, Pencil, Trash2 } from "lucide-react";
+import { Download, AlertCircle, Pencil, Trash2, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { INITIAL_RECORDS, ActivityRecord, TYPE_LABELS } from "@/lib/consulting-data";
@@ -36,7 +36,6 @@ export default function Index() {
     localStorage.setItem("consulting-records", JSON.stringify(records));
   }, [records]);
 
-  // Guardar en localStorage cada vez que cambia el nombre del cliente
   useEffect(() => {
     localStorage.setItem("consulting-client-name", clientName);
   }, [clientName]);
@@ -57,10 +56,16 @@ export default function Index() {
   };
 
   const handleClearAllData = () => {
-    if (window.confirm("🚨 ¿ESTÁS SEGURO? Esto borrará TODOS los registros permanentemente y reseteará el nombre del cliente. No se puede deshacer.")) {
+    if (window.confirm("🚨 ¿ESTÁS SEGURO? Esto borrará TODOS los registros permanentemente y dejará la tabla en blanco. No se puede deshacer.")) {
       setRecords([]);
-      setClientName("Consultoría Bancaria");
       showSuccess("Todos los datos han sido borrados");
+    }
+  };
+
+  const handleLoadDemo = () => {
+    if (window.confirm("¿Reemplazar los datos actuales con los de la captura de pantalla de ejemplo?")) {
+      setRecords(INITIAL_RECORDS);
+      showSuccess("Datos de ejemplo cargados");
     }
   };
 
@@ -82,7 +87,7 @@ export default function Index() {
 
   const opportunities = records.filter(r => r.opportunity);
   
-  // Format current month and year nicely (e.g., "Marzo 2025")
+  // Format current month and year nicely
   const dateStr = new Date().toLocaleString('es-ES', { month: 'long', year: 'numeric' });
   const formattedDate = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
 
@@ -135,10 +140,26 @@ export default function Index() {
             <Button onClick={handleExportCSV} variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50 h-9">
               📊 Exportar CSV
             </Button>
+            
             {view === 'admin' && (
-              <Button onClick={handleClearAllData} variant="ghost" className="text-red-500 hover:text-red-700 hover:bg-red-50 h-9 px-2">
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              <div className="flex gap-1 ml-auto md:ml-0">
+                <Button 
+                  onClick={handleLoadDemo} 
+                  variant="ghost" 
+                  className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 h-9 px-2"
+                  title="Cargar datos de ejemplo (captura)"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+                <Button 
+                  onClick={handleClearAllData} 
+                  variant="ghost" 
+                  className="text-red-500 hover:text-red-700 hover:bg-red-50 h-9 px-2"
+                  title="Vaciar toda la tabla"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             )}
           </div>
         </header>
