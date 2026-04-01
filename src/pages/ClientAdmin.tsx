@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -8,7 +8,7 @@ import { MetricsCards } from "@/components/consulting/MetricsCards";
 import { AdminForm } from "@/components/consulting/AdminForm";
 import { AdminTable } from "@/components/consulting/AdminTable";
 import { showSuccess, showError } from "@/utils/toast";
-import { ActivityRecord, MONTHLY_BUDGET, AREAS, DEFAULT_TYPES } from "@/lib/consulting-data";
+import { ActivityRecord, MONTHLY_BUDGET, AREAS, DEFAULT_TYPES, getPeriodInfo } from "@/lib/consulting-data";
 import { JengibreFooter } from "@/components/JengibreFooter";
 import logoUrl from "@/assets/logo.jpg";
 
@@ -18,8 +18,7 @@ export default function ClientAdmin() {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const currentYYYYMM = new Date().toISOString().slice(0, 7);
-  const [selectedMonth, setSelectedMonth] = useState(currentYYYYMM);
+  const [selectedPeriodId, setSelectedPeriodId] = useState<string>("");
 
   const { data: client, isLoading: clientLoading } = useQuery({
     queryKey: ['client', clientId],
@@ -39,6 +38,15 @@ export default function ClientAdmin() {
     }
   });
 
+  const clientStartDay = client?.period_start_day || 1;
+
+  useEffect(() => {
+    if (client && !selectedPeriodId) {
+      const current = getPeriodInfo(new Date().toISOString().split('T')[0], clientStartDay);
+      setSelectedPeriodId(current.id);
+    }
+  }, [client, selectedPeriodId, clientStartDay]);
+
   const addRecord = useMutation({
     mutationFn: async (newRecord: Omit<ActivityRecord, 'id' | 'client_id' | 'created_at'>) => {
       const { data, error } = await supabase.from('activities').insert([{ ...newRecord, client_id: clientId }]).select().single();
@@ -47,39 +55,40 @@ export default function ClientAdmin() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['activities', clientId] });
-      const recordMonth = data.date.slice(0, 7);
-      if (recordMonth !== selectedMonth) setSelectedMonth(recordMonth);
+      const recordPeriod = getPeriodInfo(data.date, clientStartDay);
+      if (recordPeriod.id !== selectedPeriodId) setSelectedPeriodId(recordPeriod.id);
     },
     onError: () => showError("Error al guardar la actividad")
   });
 
-  const deleteRecord = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('activities').delete().eq('id', id);
+  const bulkDelete = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase.from('activities').delete().in('id', ids);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['activities', clientId] });
-      showSuccess("Actividad eliminada");
     }
   });
 
-  const uniqueMonths = useMemo(() => {
-    const months = new Set(allRecords.map(r => r.date.slice(0, 7)));
-    months.add(currentYYYYMM);
-    return Array.from(months).sort().reverse();
-  }, [allRecords, currentYYYYMM]);
+  // Agrupar y crear selector de periodos
+  const uniquePeriods = useMemo(() => {
+    const periodsMap = new Map();
+    allRecords.forEach(r => {
+      const p = getPeriodInfo(r.date, clientStartDay);
+      if (!periodsMap.has(p.id)) periodsMap.set(p.id, p);
+    });
+    
+    // Asegurarse de que el periodo actual exista siempre en el selector
+    const current = getPeriodInfo(new Date().toISOString().split('T')[0], clientStartDay);
+    if (!periodsMap.has(current.id)) periodsMap.set(current.id, current);
+
+    return Array.from(periodsMap.values()).sort((a, b) => b.id.localeCompare(a.id));
+  }, [allRecords, clientStartDay]);
 
   const filteredRecords = useMemo(() => {
-    return allRecords.filter(r => r.date.startsWith(selectedMonth));
-  }, [allRecords, selectedMonth]);
-
-  const getMonthName = (yyyyMM: string) => {
-    const [year, month] = yyyyMM.split('-');
-    const date = new Date(parseInt(year), parseInt(month) - 1, 1);
-    const monthName = date.toLocaleString('es-ES', { month: 'long' });
-    return `${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${year}`;
-  };
+    return allRecords.filter(r => getPeriodInfo(r.date, clientStartDay).id === selectedPeriodId);
+  }, [allRecords, selectedPeriodId, clientStartDay]);
 
   const clientTypes = client?.activity_types ?? DEFAULT_TYPES;
 
@@ -96,7 +105,7 @@ export default function ClientAdmin() {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `reporte-${client?.name.toLowerCase().replace(/\s+/g, '-')}-${selectedMonth}.csv`;
+    link.download = `reporte-${client?.name.toLowerCase().replace(/\s+/g, '-')}-${selectedPeriodId}.csv`;
     link.click();
   };
 
@@ -104,7 +113,6 @@ export default function ClientAdmin() {
     const file = e.target.files?.[0];
     if (!file || !client) return;
 
-    // Mapa inverso para encontrar el 'value' a partir del 'label' exportado
     const reverseTypeMap = clientTypes.reduce((acc: any, t: any) => {
       acc[t.label.toLowerCase().trim()] = t.value;
       return acc;
@@ -115,7 +123,6 @@ export default function ClientAdmin() {
       const text = event.target?.result as string;
       if (!text) return;
 
-      // Dividir líneas soportando el formato de Windows (\r\n) y Mac/Linux (\n)
       const lines = text.split(/\r?\n/);
       const newRecords = [];
 
@@ -128,29 +135,17 @@ export default function ClientAdmin() {
         let currentStr = "";
         
         for (let j = 0; j < line.length; j++) {
-          if (line[j] === '"') {
-            insideQuote = !insideQuote;
-          } else if (line[j] === ',' && !insideQuote) {
-            cols.push(currentStr.trim());
-            currentStr = "";
-          } else {
-            currentStr += line[j];
-          }
+          if (line[j] === '"') insideQuote = !insideQuote;
+          else if (line[j] === ',' && !insideQuote) { cols.push(currentStr.trim()); currentStr = ""; }
+          else currentStr += line[j];
         }
         cols.push(currentStr.trim());
 
-        // Aseguramos que la fila tenga fecha y al menos 4 columnas
         if (cols.length >= 4 && cols[0]) {
           const importedLabel = (cols[1] || '').toLowerCase().trim();
-          
-          // Buscar el tipo exacto, si no existe o se borró, usamos el primero disponible
           const typeMap = reverseTypeMap[importedLabel] || clientTypes[0]?.value || 'trabajo';
-
-          // Reemplazar comas por puntos para los decimales si se editó en un Excel en español
           const hoursStr = (cols[3] || '0').replace(',', '.');
           const parsedHours = parseFloat(hoursStr);
-
-          // Limpieza exhaustiva de la variable "Sí/No"
           const oppStr = (cols[5] || '').toLowerCase().trim();
           const isOpportunity = oppStr === 'sí' || oppStr === 'si' || oppStr === 'true' || oppStr === 'yes';
 
@@ -172,17 +167,10 @@ export default function ClientAdmin() {
         if (!error) {
           queryClient.invalidateQueries({ queryKey: ['activities', clientId] });
           showSuccess(`Se importaron ${newRecords.length} actividades correctamente`);
-        } else {
-          console.error("Database import error:", error);
-          showError("Error guardando en la base de datos");
-        }
-      } else {
-        showError("No se encontraron registros válidos para importar");
+        } else showError("Error guardando en la base de datos");
       }
     };
-    
     reader.readAsText(file);
-    // Limpiamos el input para permitir volver a subir el mismo archivo si hubo un error
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -198,8 +186,9 @@ export default function ClientAdmin() {
   const clientHours = client.monthly_hours ?? MONTHLY_BUDGET;
   const clientAreas = client.areas ?? AREAS;
   const typeLabelsMap = clientTypes.reduce((acc: any, t: any) => ({...acc, [t.value]: t.label}), {});
-
   const opportunities = filteredRecords.filter(r => r.opportunity);
+  
+  const currentPeriodLabel = uniquePeriods.find(p => p.id === selectedPeriodId)?.label || '';
 
   return (
     <div className="min-h-screen bg-[#F4F5F8] text-slate-900 flex flex-col font-sans">
@@ -225,13 +214,13 @@ export default function ClientAdmin() {
             <div className="flex items-center gap-2 sm:ml-6 bg-black/20 p-1.5 rounded-lg border border-white/10">
               <CalendarDays className="h-4 w-4 text-[#D9E021] ml-2" />
               <select 
-                value={selectedMonth} 
-                onChange={e => setSelectedMonth(e.target.value)}
+                value={selectedPeriodId} 
+                onChange={e => setSelectedPeriodId(e.target.value)}
                 className="bg-transparent text-white font-bold text-sm outline-none cursor-pointer pr-2 appearance-none"
               >
-                {uniqueMonths.map(m => (
-                  <option key={m} value={m} className="text-slate-900 font-medium">
-                    {getMonthName(m)}
+                {uniquePeriods.map(p => (
+                  <option key={p.id} value={p.id} className="text-slate-900 font-medium">
+                    {p.label}
                   </option>
                 ))}
               </select>
@@ -256,15 +245,13 @@ export default function ClientAdmin() {
 
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
           <AdminForm onAdd={(data) => addRecord.mutate(data)} areas={clientAreas} activityTypes={clientTypes} />
-          <AdminTable records={filteredRecords} onDelete={(id) => {
-            if(window.confirm("¿Seguro que deseas borrar esto?")) deleteRecord.mutate(id);
-          }} typeLabels={typeLabelsMap} />
+          <AdminTable records={filteredRecords} onDelete={(ids) => bulkDelete.mutate(ids)} typeLabels={typeLabelsMap} />
 
           {opportunities.length > 0 && (
             <div className="bg-white border-2 border-[#E32462]/30 rounded-xl p-6 mb-8 shadow-sm relative overflow-hidden">
               <div className="absolute top-0 left-0 w-1.5 h-full bg-[#E32462]"></div>
               <h2 className="text-[#E32462] font-bold text-sm mb-4 flex items-center gap-2 uppercase tracking-wide">
-                🚀 Oportunidades de proyectos extra detectadas ({getMonthName(selectedMonth)})
+                🚀 Oportunidades de proyectos extra detectadas ({currentPeriodLabel})
               </h2>
               <div className="space-y-0 mb-2">
                 {opportunities.map(opp => (

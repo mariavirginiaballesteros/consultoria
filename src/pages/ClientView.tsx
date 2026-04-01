@@ -1,10 +1,10 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { MetricsCards } from "@/components/consulting/MetricsCards";
 import { ClientOverview } from "@/components/consulting/ClientOverview";
-import { ActivityRecord, MONTHLY_BUDGET, DEFAULT_TYPES } from "@/lib/consulting-data";
+import { ActivityRecord, MONTHLY_BUDGET, DEFAULT_TYPES, getPeriodInfo } from "@/lib/consulting-data";
 import { Loader2, FileDown, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { JengibreFooter } from "@/components/JengibreFooter";
@@ -16,9 +16,7 @@ import logoUrl from "@/assets/logo.jpg";
 export default function ClientView() {
   const { clientId } = useParams();
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-  
-  const currentYYYYMM = new Date().toISOString().slice(0, 7);
-  const [selectedMonth, setSelectedMonth] = useState(currentYYYYMM);
+  const [selectedPeriodId, setSelectedPeriodId] = useState<string>("");
 
   const { data: client, isLoading: clientLoading } = useQuery({
     queryKey: ['client', clientId],
@@ -39,30 +37,37 @@ export default function ClientView() {
     refetchInterval: 5000 
   });
 
-  // Filtrado de meses
-  const uniqueMonths = useMemo(() => {
-    const months = new Set(allRecords.map(r => r.date.slice(0, 7)));
-    months.add(currentYYYYMM);
-    return Array.from(months).sort().reverse();
-  }, [allRecords, currentYYYYMM]);
+  const clientStartDay = client?.period_start_day || 1;
+
+  useEffect(() => {
+    if (client && !selectedPeriodId) {
+      const current = getPeriodInfo(new Date().toISOString().split('T')[0], clientStartDay);
+      setSelectedPeriodId(current.id);
+    }
+  }, [client, selectedPeriodId, clientStartDay]);
+
+  const uniquePeriods = useMemo(() => {
+    const periodsMap = new Map();
+    allRecords.forEach(r => {
+      const p = getPeriodInfo(r.date, clientStartDay);
+      if (!periodsMap.has(p.id)) periodsMap.set(p.id, p);
+    });
+    
+    const current = getPeriodInfo(new Date().toISOString().split('T')[0], clientStartDay);
+    if (!periodsMap.has(current.id)) periodsMap.set(current.id, current);
+
+    return Array.from(periodsMap.values()).sort((a, b) => b.id.localeCompare(a.id));
+  }, [allRecords, clientStartDay]);
 
   const filteredRecords = useMemo(() => {
-    return allRecords.filter(r => r.date.startsWith(selectedMonth));
-  }, [allRecords, selectedMonth]);
-
-  const getMonthName = (yyyyMM: string) => {
-    const [year, month] = yyyyMM.split('-');
-    const date = new Date(parseInt(year), parseInt(month) - 1, 1);
-    const monthName = date.toLocaleString('es-ES', { month: 'long' });
-    return `${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${year}`;
-  };
+    return allRecords.filter(r => getPeriodInfo(r.date, clientStartDay).id === selectedPeriodId);
+  }, [allRecords, selectedPeriodId, clientStartDay]);
 
   const generatePDF = async () => {
     const element = document.getElementById("pdf-content");
     const listContainer = document.getElementById("activity-list-container");
     
     if (!element) return;
-
     setIsGeneratingPdf(true);
 
     if (listContainer) {
@@ -73,19 +78,9 @@ export default function ClientView() {
     await new Promise(resolve => setTimeout(resolve, 100));
 
     try {
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: "#F4F5F8",
-      });
-
+      const canvas = await html2canvas(element, { scale: 2, useCORS: true, logging: false, backgroundColor: "#F4F5F8" });
       const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
-      });
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
@@ -104,7 +99,7 @@ export default function ClientView() {
         heightLeft -= pageHeight;
       }
 
-      pdf.save(`Reporte_Jengibre_${client?.name.replace(/\s+/g, '_')}_${selectedMonth}.pdf`);
+      pdf.save(`Reporte_Jengibre_${client?.name.replace(/\s+/g, '_')}_${selectedPeriodId}.pdf`);
       showSuccess("PDF descargado correctamente con todas las tareas");
     } catch (error) {
       console.error(error);
@@ -133,6 +128,7 @@ export default function ClientView() {
   const clientHours = client.monthly_hours ?? MONTHLY_BUDGET;
   const clientTypes = client.activity_types ?? DEFAULT_TYPES;
   const typeLabelsMap = clientTypes.reduce((acc: any, t: any) => ({...acc, [t.value]: t.label}), {});
+  const currentPeriodLabel = uniquePeriods.find(p => p.id === selectedPeriodId)?.label || '';
 
   return (
     <div className="min-h-screen bg-[#F4F5F8] text-slate-900 flex flex-col font-sans selection:bg-[#62BAD3]/30">
@@ -143,11 +139,7 @@ export default function ClientView() {
           disabled={isGeneratingPdf}
           className="bg-[#E32462] hover:bg-[#c21d51] text-white shadow-xl rounded-full h-14 px-6 font-bold text-base flex items-center gap-2 transition-transform hover:scale-105"
         >
-          {isGeneratingPdf ? (
-            <Loader2 className="h-5 w-5 animate-spin" />
-          ) : (
-            <FileDown className="h-5 w-5" />
-          )}
+          {isGeneratingPdf ? <Loader2 className="h-5 w-5 animate-spin" /> : <FileDown className="h-5 w-5" />}
           {isGeneratingPdf ? "Generando..." : "Descargar PDF"}
         </Button>
       </div>
@@ -164,25 +156,23 @@ export default function ClientView() {
                 {client.name}
               </h1>
               
-              {/* Selector de Mes para el Cliente */}
               <div className="mt-2 flex items-center bg-black/20 w-fit px-3 py-1.5 rounded-lg border border-white/10" data-html2canvas-ignore>
                 <CalendarDays className="h-4 w-4 text-[#D9E021] mr-2" />
                 <select 
-                  value={selectedMonth} 
-                  onChange={e => setSelectedMonth(e.target.value)}
+                  value={selectedPeriodId} 
+                  onChange={e => setSelectedPeriodId(e.target.value)}
                   className="bg-transparent text-white font-bold text-sm outline-none cursor-pointer pr-2 appearance-none"
                 >
-                  {uniqueMonths.map(m => (
-                    <option key={m} value={m} className="text-slate-900 font-medium">
-                      {getMonthName(m)}
+                  {uniquePeriods.map(p => (
+                    <option key={p.id} value={p.id} className="text-slate-900 font-medium">
+                      {p.label}
                     </option>
                   ))}
                 </select>
               </div>
               
-              {/* Elemento que sólo se verá en el PDF estático */}
               <span className="hidden text-base font-bold text-[#62BAD3] mt-1" data-html2canvas-show style={{ display: 'none' }}>
-                {getMonthName(selectedMonth)}
+                Periodo: {currentPeriodLabel}
               </span>
             </div>
           </div>
@@ -196,7 +186,6 @@ export default function ClientView() {
           </div>
         </header>
 
-        {/* Pequeño script para manejar la visibilidad al renderizar PDF */}
         <style dangerouslySetInnerHTML={{__html: `
           #pdf-content[data-rendering="true"] [data-html2canvas-ignore] { display: none !important; }
           #pdf-content[data-rendering="true"] [data-html2canvas-show] { display: block !important; }

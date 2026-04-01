@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, ArrowRight, Trash2, Copy, DatabaseZap, X } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
@@ -17,10 +17,10 @@ export default function Index() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   
-  // Dialog State
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [name, setName] = useState("");
   const [monthlyHours, setMonthlyHours] = useState(20);
+  const [periodStartDay, setPeriodStartDay] = useState(1);
   const [areas, setAreas] = useState<string[]>(AREAS);
   const [types, setTypes] = useState(DEFAULT_TYPES);
   
@@ -58,6 +58,7 @@ export default function Index() {
   const resetForm = () => {
     setName("");
     setMonthlyHours(20);
+    setPeriodStartDay(1);
     setAreas(AREAS);
     setTypes(DEFAULT_TYPES);
   };
@@ -81,6 +82,7 @@ export default function Index() {
     createClient.mutate({
       name: name.trim(),
       monthly_hours: monthlyHours,
+      period_start_day: periodStartDay,
       areas: areas,
       activity_types: types
     });
@@ -165,9 +167,15 @@ export default function Index() {
                   <Input value={name} onChange={e => setName(e.target.value)} placeholder="Ej: Acme Corp" className="h-12 text-base" />
                 </div>
 
-                <div className="space-y-2">
-                  <Label className="font-bold text-slate-600">Horas mensuales contratadas</Label>
-                  <Input type="number" min="1" value={monthlyHours} onChange={e => setMonthlyHours(Number(e.target.value))} className="h-12 text-base" />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="font-bold text-slate-600">Horas mensuales</Label>
+                    <Input type="number" min="1" value={monthlyHours} onChange={e => setMonthlyHours(Number(e.target.value))} className="h-12 text-base" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="font-bold text-slate-600">Día de inicio de ciclo</Label>
+                    <Input type="number" min="1" max="28" value={periodStartDay} onChange={e => setPeriodStartDay(Number(e.target.value))} className="h-12 text-base" title="Día en que se reinicia el contador de horas" />
+                  </div>
                 </div>
 
                 <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
@@ -221,7 +229,7 @@ export default function Index() {
                 <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="flex flex-col">
                     <span className="font-bold text-lg text-[#2A2B73]">{client.name}</span>
-                    {client.monthly_hours && <span className="text-xs text-slate-500 font-medium">{client.monthly_hours}h mensuales asignadas</span>}
+                    {client.monthly_hours && <span className="text-xs text-slate-500 font-medium">{client.monthly_hours}h mensuales asignadas {client.period_start_day && client.period_start_day > 1 && `(Corte día ${client.period_start_day})`}</span>}
                   </div>
                   <div className="flex items-center gap-2 w-full sm:w-auto">
                     <Button variant="outline" size="sm" onClick={() => copyLink(client.id)} className="flex-1 sm:flex-none border-slate-200 hover:bg-[#62BAD3]/10 hover:text-[#62BAD3]" title="Copiar enlace">
