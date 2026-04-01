@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
-import { ActivityRecord } from "@/lib/consulting-data";
+import { ActivityRecord, formatDate } from "@/lib/consulting-data";
 import { Users, Zap, FileText, CheckCircle2, MessageSquare, Calendar, FolderTree, Clock } from "lucide-react";
 
 interface ClientOverviewProps {
@@ -54,8 +54,8 @@ export function ClientOverview({ records, monthlyHours, typeLabels, onUpdateClie
                 {/* Cabecera */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 pb-3">
                   <div className="flex flex-wrap items-center gap-3">
-                    <span className="flex items-center text-sm font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-md">
-                      <Calendar className="h-4 w-4 mr-1.5" /> {r.date}
+                    <span className="flex items-center text-sm font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-md whitespace-nowrap">
+                      <Calendar className="h-4 w-4 mr-1.5" /> {formatDate(r.date)}
                     </span>
                     <span className="flex items-center text-sm font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-md">
                       <FolderTree className="h-4 w-4 mr-1.5" /> {r.area}

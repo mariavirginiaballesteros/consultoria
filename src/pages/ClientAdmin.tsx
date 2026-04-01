@@ -2,7 +2,7 @@ import { useState, useRef, useMemo, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Copy, Download, Upload, Settings, CalendarDays, Clock } from "lucide-react";
+import { ArrowLeft, Copy, Download, Upload, Settings, CalendarDays, Clock, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MetricsCards } from "@/components/consulting/MetricsCards";
 import { AdminForm } from "@/components/consulting/AdminForm";
@@ -195,10 +195,27 @@ export default function ClientAdmin() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const copyClientLink = () => {
+  const copyClientLink = async () => {
     const url = `${window.location.origin}/client/${clientId}`;
-    navigator.clipboard.writeText(url);
-    showSuccess("Enlace copiado. ¡Envíalo a tu cliente!");
+    try {
+      await navigator.clipboard.writeText(url);
+      showSuccess("Enlace copiado. ¡Envíalo a tu cliente!");
+    } catch (err) {
+      // Método de respaldo para entornos bloqueados (como el iframe)
+      const textArea = document.createElement("textarea");
+      textArea.value = url;
+      textArea.style.position = "fixed";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        showSuccess("Enlace copiado. ¡Envíalo a tu cliente!");
+      } catch (e) {
+        showError("No se pudo copiar el enlace por seguridad del navegador.");
+      }
+      document.body.removeChild(textArea);
+    }
   };
 
   if (clientLoading) return <div className="min-h-screen p-10 text-center font-medium">Cargando...</div>;
@@ -248,7 +265,7 @@ export default function ClientAdmin() {
             </div>
           </div>
 
-          <div className="relative z-10 flex flex-wrap items-center gap-3 w-full lg:w-auto mt-2 lg:mt-0">
+          <div className="relative z-10 flex flex-wrap items-center gap-2 w-full lg:w-auto mt-2 lg:mt-0">
             <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={handleImportCSV} />
             <Button onClick={() => fileInputRef.current?.click()} variant="outline" size="sm" className="h-9 border-white/20 bg-white/5 text-white hover:bg-white/20 hover:text-white flex-1 sm:flex-none">
               <Upload className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Importar</span>
@@ -256,8 +273,13 @@ export default function ClientAdmin() {
             <Button onClick={handleExportCSV} variant="outline" size="sm" className="h-9 border-white/20 bg-white/5 text-white hover:bg-white/20 hover:text-white flex-1 sm:flex-none">
               <Download className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Exportar Mes</span>
             </Button>
+            
+            <Button onClick={() => window.open(`/client/${clientId}`, '_blank')} variant="outline" size="sm" className="h-9 border-white/20 bg-white/5 text-white hover:bg-white/20 hover:text-white flex-1 sm:flex-none" title="Abrir vista de cliente">
+              <ExternalLink className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Ver Vista</span>
+            </Button>
+
             <Button onClick={copyClientLink} size="sm" className="h-9 bg-[#D9E021] text-[#2A2B73] hover:bg-[#c6cc1b] font-bold flex-1 sm:flex-none">
-              <Copy className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Link Cliente</span>
+              <Copy className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Copiar Link</span>
             </Button>
           </div>
         </header>

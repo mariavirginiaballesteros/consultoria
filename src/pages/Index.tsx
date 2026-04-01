@@ -107,10 +107,26 @@ export default function Index() {
     }
   };
 
-  const copyLink = (clientId: string) => {
+  const copyLink = async (clientId: string) => {
     const url = `${window.location.origin}/client/${clientId}`;
-    navigator.clipboard.writeText(url);
-    showSuccess("Enlace copiado al portapapeles");
+    try {
+      await navigator.clipboard.writeText(url);
+      showSuccess("Enlace copiado al portapapeles");
+    } catch (err) {
+      const textArea = document.createElement("textarea");
+      textArea.value = url;
+      textArea.style.position = "fixed";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        showSuccess("Enlace copiado al portapapeles");
+      } catch (e) {
+        showError("No se pudo copiar el enlace por seguridad del navegador.");
+      }
+      document.body.removeChild(textArea);
+    }
   };
 
   return (

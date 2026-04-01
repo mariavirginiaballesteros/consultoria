@@ -3,7 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Trash2, Pencil, Check, Users, Zap, FileText, CheckCircle2, Clock } from "lucide-react";
-import { ActivityRecord } from "@/lib/consulting-data";
+import { ActivityRecord, formatDate } from "@/lib/consulting-data";
 
 interface AdminTableProps {
   records: ActivityRecord[];
@@ -91,7 +91,9 @@ export function AdminTable({ records, onEdit, onDelete, typeLabels }: AdminTable
                     className="data-[state=checked]:bg-[#2A2B73] data-[state=checked]:border-[#2A2B73]"
                   />
                 </TableCell>
-                <TableCell className="font-medium text-xs text-slate-600">{r.date}</TableCell>
+                <TableCell className="font-medium text-xs text-slate-600 whitespace-nowrap">
+                  {formatDate(r.date)}
+                </TableCell>
                 <TableCell className="text-xs whitespace-nowrap">
                   <div className="flex items-center font-medium text-slate-700">
                     {getTypeIcon(r.type)}

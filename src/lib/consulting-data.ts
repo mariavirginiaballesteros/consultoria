@@ -67,3 +67,11 @@ export function getPeriodInfo(dateStr: string, startDay: number = 1) {
     };
   }
 }
+
+// Función para mostrar la fecha en formato DD-MM-AAAA
+export function formatDate(dateStr: string) {
+  if (!dateStr) return "";
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  return `${parts[2]}-${parts[1]}-${parts[0]}`;
+}
