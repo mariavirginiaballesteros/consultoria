@@ -14,7 +14,7 @@ export function MetricsCards({ records, isClientView }: MetricsCardsProps) {
   const opportunities = records.filter(r => r.opportunity).length;
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+    <div className={`grid gap-3 mb-8 ${isClientView ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-2 md:grid-cols-4'}`}>
       <Card className="shadow-sm">
         <CardContent className="p-4">
           <div className="text-[11px] text-muted-foreground uppercase tracking-wider mb-2 font-medium">
@@ -30,23 +30,22 @@ export function MetricsCards({ records, isClientView }: MetricsCardsProps) {
       {isClientView && (
          <Card className="shadow-sm">
            <CardContent className="p-4">
-             <div className="text-[11px] text-muted-foreground uppercase tracking-wider mb-2 font-medium">Horas disponibles</div>
+             <div className="text-[11px] text-muted-foreground uppercase tracking-wider mb-2 font-medium">Horas contratadas</div>
              <div className="text-2xl font-bold text-slate-900">{MONTHLY_BUDGET}h</div>
            </CardContent>
          </Card>
       )}
 
-      {extraHours > 0 && (
-        <Card className="shadow-sm border-red-200 bg-red-50/50">
-          <CardContent className="p-4">
-            <div className="text-[11px] text-red-600 uppercase tracking-wider mb-2 font-medium">Horas extras</div>
-            <div className="text-2xl font-bold text-red-600">{Math.round(extraHours * 10) / 10}h</div>
-            {!isClientView && (
-              <div className="text-[11px] text-red-500/80 mt-1">para facturación</div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      <Card className={`shadow-sm transition-colors ${extraHours > 0 ? 'border-red-200 bg-red-50/50' : ''}`}>
+        <CardContent className="p-4">
+          <div className={`text-[11px] uppercase tracking-wider mb-2 font-medium ${extraHours > 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+            Horas extras facturables
+          </div>
+          <div className={`text-2xl font-bold ${extraHours > 0 ? 'text-red-600' : 'text-slate-900'}`}>
+            {Math.round(extraHours * 10) / 10}h
+          </div>
+        </CardContent>
+      </Card>
 
       {!isClientView && (
         <>
