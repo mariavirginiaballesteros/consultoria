@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, ArrowRight, Trash2, Copy, DatabaseZap, X } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Plus, ArrowRight, Trash2, Copy, DatabaseZap, X, Pencil } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
 import { JengibreFooter } from "@/components/JengibreFooter";
 import { AREAS, DEFAULT_TYPES } from "@/lib/consulting-data";
@@ -18,9 +18,13 @@ export default function Index() {
   const queryClient = useQueryClient();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingClient, setEditingClient] = useState<any>(null);
+  
   const [name, setName] = useState("");
   const [monthlyHours, setMonthlyHours] = useState(20);
   const [periodStartDay, setPeriodStartDay] = useState(1);
+  const [contractStartDate, setContractStartDate] = useState("");
+  const [contractDuration, setContractDuration] = useState<string>("");
   const [areas, setAreas] = useState<string[]>(AREAS);
   const [types, setTypes] = useState(DEFAULT_TYPES);
   
@@ -51,17 +55,27 @@ export default function Index() {
     },
     onError: (err) => {
       console.error(err);
-      showError("Error al crear cliente. ¿Actualizaste la base de datos?");
+      showError("Error al crear cliente. ¿Actualizaste la base de datos con las nuevas columnas?");
     }
   });
 
-  const resetForm = () => {
-    setName("");
-    setMonthlyHours(20);
-    setPeriodStartDay(1);
-    setAreas(AREAS);
-    setTypes(DEFAULT_TYPES);
-  };
+  const updateClient = useMutation({
+    mutationFn: async (clientData: any) => {
+      const { data, error } = await supabase.from('clients').update(clientData).eq('id', editingClient.id).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      setIsDialogOpen(false);
+      resetForm();
+      showSuccess("Cliente actualizado con éxito");
+    },
+    onError: (err) => {
+      console.error(err);
+      showError("Error al actualizar cliente. ¿Actualizaste la base de datos?");
+    }
+  });
 
   const deleteClient = useMutation({
     mutationFn: async (id: string) => {
@@ -74,18 +88,55 @@ export default function Index() {
     }
   });
 
-  const handleCreate = () => {
+  const resetForm = () => {
+    setEditingClient(null);
+    setName("");
+    setMonthlyHours(20);
+    setPeriodStartDay(1);
+    setContractStartDate("");
+    setContractDuration("");
+    setAreas(AREAS);
+    setTypes(DEFAULT_TYPES);
+  };
+
+  const handleOpenCreate = () => {
+    resetForm();
+    setIsDialogOpen(true);
+  };
+
+  const handleOpenEdit = (client: any) => {
+    setEditingClient(client);
+    setName(client.name);
+    setMonthlyHours(client.monthly_hours || 20);
+    setPeriodStartDay(client.period_start_day || 1);
+    setContractStartDate(client.contract_start_date || "");
+    setContractDuration(client.contract_duration_months ? String(client.contract_duration_months) : "");
+    setAreas(client.areas || AREAS);
+    setTypes(client.activity_types || DEFAULT_TYPES);
+    setIsDialogOpen(true);
+  };
+
+  const handleSave = () => {
     if (!name.trim()) {
       showError("El nombre es obligatorio");
       return;
     }
-    createClient.mutate({
+
+    const payload = {
       name: name.trim(),
       monthly_hours: monthlyHours,
       period_start_day: periodStartDay,
+      contract_start_date: contractStartDate || null,
+      contract_duration_months: contractDuration ? parseInt(contractDuration) : null,
       areas: areas,
       activity_types: types
-    });
+    };
+
+    if (editingClient) {
+      updateClient.mutate(payload);
+    } else {
+      createClient.mutate(payload);
+    }
   };
 
   const addArea = (e: React.FormEvent) => {
@@ -165,16 +216,20 @@ export default function Index() {
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold text-[#2A2B73]">Tus Clientes Activos</h2>
           
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-[#D9E021] hover:bg-[#c6cc1b] text-[#2A2B73] font-bold shadow-md">
-                <Plus className="h-5 w-5 mr-2" />
-                Nuevo Cliente
-              </Button>
-            </DialogTrigger>
+          <Button onClick={handleOpenCreate} className="bg-[#D9E021] hover:bg-[#c6cc1b] text-[#2A2B73] font-bold shadow-md">
+            <Plus className="h-5 w-5 mr-2" />
+            Nuevo Cliente
+          </Button>
+
+          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+            setIsDialogOpen(open);
+            if (!open) resetForm();
+          }}>
             <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle className="text-2xl font-black text-[#2A2B73]">Configurar Cliente</DialogTitle>
+                <DialogTitle className="text-2xl font-black text-[#2A2B73]">
+                  {editingClient ? "Editar Cliente" : "Configurar Cliente"}
+                </DialogTitle>
               </DialogHeader>
               <div className="space-y-6 py-4">
                 
@@ -191,6 +246,17 @@ export default function Index() {
                   <div className="space-y-2">
                     <Label className="font-bold text-slate-600">Día de inicio de ciclo</Label>
                     <Input type="number" min="1" max="28" value={periodStartDay} onChange={e => setPeriodStartDay(Number(e.target.value))} className="h-12 text-base" title="Día en que se reinicia el contador de horas" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="font-bold text-slate-600">Inicio del contrato <span className="text-slate-400 font-normal">(Opcional)</span></Label>
+                    <Input type="date" value={contractStartDate} onChange={e => setContractStartDate(e.target.value)} className="h-12 text-base" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="font-bold text-slate-600">Duración en meses <span className="text-slate-400 font-normal">(Opcional)</span></Label>
+                    <Input type="number" min="1" value={contractDuration} onChange={e => setContractDuration(e.target.value)} placeholder="Ej: 3" className="h-12 text-base" />
                   </div>
                 </div>
 
@@ -224,8 +290,8 @@ export default function Index() {
                   </div>
                 </div>
 
-                <Button onClick={handleCreate} disabled={createClient.isPending} className="w-full h-12 bg-[#D9E021] text-[#2A2B73] font-bold hover:bg-[#c6cc1b] text-base shadow-md">
-                  {createClient.isPending ? "Guardando..." : "Crear e Iniciar"}
+                <Button onClick={handleSave} disabled={createClient.isPending || updateClient.isPending} className="w-full h-12 bg-[#D9E021] text-[#2A2B73] font-bold hover:bg-[#c6cc1b] text-base shadow-md">
+                  {createClient.isPending || updateClient.isPending ? "Guardando..." : (editingClient ? "Guardar Cambios" : "Crear e Iniciar")}
                 </Button>
               </div>
             </DialogContent>
@@ -245,7 +311,12 @@ export default function Index() {
                 <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="flex flex-col">
                     <span className="font-bold text-lg text-[#2A2B73]">{client.name}</span>
-                    {client.monthly_hours && <span className="text-xs text-slate-500 font-medium">{client.monthly_hours}h mensuales asignadas {client.period_start_day && client.period_start_day > 1 && `(Corte día ${client.period_start_day})`}</span>}
+                    <div className="flex flex-wrap gap-x-2 gap-y-1">
+                      {client.monthly_hours && <span className="text-xs text-slate-500 font-medium">{client.monthly_hours}h mensuales asignadas {client.period_start_day && client.period_start_day > 1 && `(Corte día ${client.period_start_day})`}</span>}
+                      {client.contract_start_date && client.contract_duration_months && (
+                        <span className="text-xs font-bold text-[#62BAD3]"> • Contrato: {client.contract_duration_months} meses</span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 w-full sm:w-auto">
                     <Button variant="outline" size="sm" onClick={() => copyLink(client.id)} className="flex-1 sm:flex-none border-slate-200 hover:bg-[#62BAD3]/10 hover:text-[#62BAD3]" title="Copiar enlace">
@@ -255,11 +326,16 @@ export default function Index() {
                     <Button onClick={() => navigate(`/admin/${client.id}`)} size="sm" className="flex-1 sm:flex-none bg-[#2A2B73] text-white hover:bg-[#1f2055]">
                       Gestionar <ArrowRight className="h-4 w-4 ml-2" />
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => {
-                      if(window.confirm('¿Borrar este cliente y TODAS sus actividades?')) deleteClient.mutate(client.id);
-                    }} className="text-slate-400 hover:text-[#E32462] hover:bg-[#E32462]/10 px-2">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex border-l border-slate-200 pl-2 ml-1">
+                      <Button variant="ghost" size="sm" onClick={() => handleOpenEdit(client)} className="text-slate-400 hover:text-[#2A2B73] hover:bg-slate-100 px-2" title="Editar cliente">
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => {
+                        if(window.confirm('¿Borrar este cliente y TODAS sus actividades?')) deleteClient.mutate(client.id);
+                      }} className="text-slate-400 hover:text-[#E32462] hover:bg-[#E32462]/10 px-2" title="Eliminar cliente">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

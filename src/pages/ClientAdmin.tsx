@@ -9,7 +9,7 @@ import { AdminForm } from "@/components/consulting/AdminForm";
 import { AdminTable } from "@/components/consulting/AdminTable";
 import { EditActivityDialog } from "@/components/consulting/EditActivityDialog";
 import { showSuccess, showError } from "@/utils/toast";
-import { ActivityRecord, MONTHLY_BUDGET, AREAS, DEFAULT_TYPES, getPeriodInfo } from "@/lib/consulting-data";
+import { ActivityRecord, MONTHLY_BUDGET, AREAS, DEFAULT_TYPES, getPeriodInfo, formatDate } from "@/lib/consulting-data";
 import { JengibreFooter } from "@/components/JengibreFooter";
 import logoUrl from "@/assets/logo.jpg";
 
@@ -248,7 +248,13 @@ export default function ClientAdmin() {
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-xs font-bold text-[#D9E021] flex items-center gap-1"><Settings className="h-3 w-3" /> Admin</span>
                   <span className="text-white/40 text-xs">•</span>
-                  <span className="text-xs font-medium text-white/80 flex items-center gap-1"><FileSignature className="h-3 w-3 text-[#62BAD3]" /> Contrato: <strong className="text-white">{clientHours}h/mes</strong></span>
+                  <span className="text-xs font-medium text-white/80 flex items-center flex-wrap gap-1">
+                    <FileSignature className="h-3 w-3 text-[#62BAD3]" /> 
+                    Contrato: <strong className="text-white">{clientHours}h/mes</strong>
+                    {client.contract_start_date && client.contract_duration_months && (
+                      <span className="text-white/60 ml-1">• {client.contract_duration_months} meses desde el {formatDate(client.contract_start_date)}</span>
+                    )}
+                  </span>
                 </div>
               </div>
             </div>

@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MetricsCards } from "@/components/consulting/MetricsCards";
 import { ClientOverview } from "@/components/consulting/ClientOverview";
-import { ActivityRecord, MONTHLY_BUDGET, DEFAULT_TYPES, getPeriodInfo } from "@/lib/consulting-data";
+import { ActivityRecord, MONTHLY_BUDGET, DEFAULT_TYPES, getPeriodInfo, formatDate } from "@/lib/consulting-data";
 import { Loader2, FileDown, CalendarDays, Clock, FileSignature } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { JengibreFooter } from "@/components/JengibreFooter";
@@ -174,8 +174,12 @@ export default function ClientView() {
               </h1>
               
               <div className="flex flex-wrap items-center gap-3 mt-2">
-                <span className="flex items-center text-sm font-medium text-white bg-white/10 px-3 py-1.5 rounded-lg border border-white/5">
-                  <FileSignature className="h-4 w-4 mr-2 text-[#62BAD3]" /> Contrato: <strong className="ml-1 text-white">{clientHours}h mensuales</strong>
+                <span className="flex flex-wrap items-center text-sm font-medium text-white bg-white/10 px-3 py-1.5 rounded-lg border border-white/5">
+                  <FileSignature className="h-4 w-4 mr-2 text-[#62BAD3]" /> 
+                  Contrato: <strong className="ml-1 text-white">{clientHours}h mensuales</strong>
+                  {client.contract_start_date && client.contract_duration_months && (
+                    <span className="text-white/80 ml-1.5 hidden sm:inline"> • {client.contract_duration_months} meses (desde {formatDate(client.contract_start_date)})</span>
+                  )}
                 </span>
 
                 <div className="flex items-center bg-black/20 px-3 py-1.5 rounded-lg border border-white/10" data-html2canvas-ignore>
@@ -193,6 +197,13 @@ export default function ClientView() {
                   </select>
                 </div>
               </div>
+
+              {/* Mostrar contrato en móvil por debajo para que no colapse la línea */}
+              {client.contract_start_date && client.contract_duration_months && (
+                <span className="text-xs font-medium text-white/70 mt-1 sm:hidden">
+                  Duración: {client.contract_duration_months} meses desde el {formatDate(client.contract_start_date)}
+                </span>
+              )}
               
               <span className="hidden text-base font-bold text-[#62BAD3] mt-2" data-html2canvas-show style={{ display: 'none' }}>
                 Periodo: {currentPeriodLabel}
