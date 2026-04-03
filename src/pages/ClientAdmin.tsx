@@ -2,7 +2,7 @@ import { useState, useRef, useMemo, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Copy, Download, Upload, Settings, CalendarDays, Clock, ExternalLink } from "lucide-react";
+import { ArrowLeft, Copy, Download, Upload, Settings, CalendarDays, Clock, ExternalLink, FileSignature } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MetricsCards } from "@/components/consulting/MetricsCards";
 import { AdminForm } from "@/components/consulting/AdminForm";
@@ -245,7 +245,11 @@ export default function ClientAdmin() {
                 <h1 className="text-2xl font-black text-white leading-tight truncate max-w-[200px] sm:max-w-full">
                   {client.name}
                 </h1>
-                <span className="text-sm font-bold text-[#D9E021] flex items-center gap-1"><Settings className="h-3 w-3" /> Administración</span>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-xs font-bold text-[#D9E021] flex items-center gap-1"><Settings className="h-3 w-3" /> Admin</span>
+                  <span className="text-white/40 text-xs">•</span>
+                  <span className="text-xs font-medium text-white/80 flex items-center gap-1"><FileSignature className="h-3 w-3 text-[#62BAD3]" /> Contrato: <strong className="text-white">{clientHours}h/mes</strong></span>
+                </div>
               </div>
             </div>
 

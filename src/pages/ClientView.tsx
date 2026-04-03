@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MetricsCards } from "@/components/consulting/MetricsCards";
 import { ClientOverview } from "@/components/consulting/ClientOverview";
 import { ActivityRecord, MONTHLY_BUDGET, DEFAULT_TYPES, getPeriodInfo } from "@/lib/consulting-data";
-import { Loader2, FileDown, CalendarDays, Clock } from "lucide-react";
+import { Loader2, FileDown, CalendarDays, Clock, FileSignature } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { JengibreFooter } from "@/components/JengibreFooter";
 import { showSuccess, showError } from "@/utils/toast";
@@ -173,22 +173,28 @@ export default function ClientView() {
                 {client.name}
               </h1>
               
-              <div className="mt-2 flex items-center bg-black/20 w-fit px-3 py-1.5 rounded-lg border border-white/10" data-html2canvas-ignore>
-                <CalendarDays className="h-4 w-4 text-[#D9E021] mr-2" />
-                <select 
-                  value={selectedPeriodId} 
-                  onChange={e => setSelectedPeriodId(e.target.value)}
-                  className="bg-transparent text-white font-bold text-sm outline-none cursor-pointer pr-2 appearance-none"
-                >
-                  {uniquePeriods.map(p => (
-                    <option key={p.id} value={p.id} className="text-slate-900 font-medium">
-                      {p.label}
-                    </option>
-                  ))}
-                </select>
+              <div className="flex flex-wrap items-center gap-3 mt-2">
+                <span className="flex items-center text-sm font-medium text-white bg-white/10 px-3 py-1.5 rounded-lg border border-white/5">
+                  <FileSignature className="h-4 w-4 mr-2 text-[#62BAD3]" /> Contrato: <strong className="ml-1 text-white">{clientHours}h mensuales</strong>
+                </span>
+
+                <div className="flex items-center bg-black/20 px-3 py-1.5 rounded-lg border border-white/10" data-html2canvas-ignore>
+                  <CalendarDays className="h-4 w-4 text-[#D9E021] mr-2" />
+                  <select 
+                    value={selectedPeriodId} 
+                    onChange={e => setSelectedPeriodId(e.target.value)}
+                    className="bg-transparent text-white font-bold text-sm outline-none cursor-pointer pr-2 appearance-none"
+                  >
+                    {uniquePeriods.map(p => (
+                      <option key={p.id} value={p.id} className="text-slate-900 font-medium">
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
               
-              <span className="hidden text-base font-bold text-[#62BAD3] mt-1" data-html2canvas-show style={{ display: 'none' }}>
+              <span className="hidden text-base font-bold text-[#62BAD3] mt-2" data-html2canvas-show style={{ display: 'none' }}>
                 Periodo: {currentPeriodLabel}
               </span>
             </div>
