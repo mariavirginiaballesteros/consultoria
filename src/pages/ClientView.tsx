@@ -52,13 +52,15 @@ export default function ClientView() {
     refetchInterval: 5000 
   });
 
-  // ... (Resto de la lógica idéntica)...
   const updateClientNote = useMutation({
     mutationFn: async ({ id, client_notes }: { id: string, client_notes: string }) => {
       const { error } = await supabase.from('activities').update({ client_notes }).eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['activities', clientId] }); showSuccess("Observación guardada"); }
+    onSuccess: () => { 
+      queryClient.invalidateQueries({ queryKey: ['activities', clientId] }); 
+      showSuccess("Observación guardada"); 
+    }
   });
 
   const clientStartDay = client?.period_start_day || 1;
@@ -88,7 +90,55 @@ export default function ClientView() {
 
   const opportunities = filteredRecords.filter(r => r.opportunity);
 
-  const generatePDF = async () => { /* Logica PDF... */ };
+  const generatePDF = async () => {
+    const element = document.getElementById("pdf-content");
+    const listContainer = document.getElementById("activity-list-container");
+    
+    if (!element) return;
+    setIsGeneratingPdf(true);
+
+    if (listContainer) {
+      listContainer.style.maxHeight = "none";
+      listContainer.style.overflow = "visible";
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    try {
+      const canvas = await html2canvas(element, { scale: 2, useCORS: true, logging: false, backgroundColor: "#F4F5F8" });
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      let heightLeft = pdfHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, "PNG", 0, position, pdfWidth, pdfHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - pdfHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, pdfWidth, pdfHeight);
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(`Reporte_Jengibre_${client?.name.replace(/\s+/g, '_')}_${selectedPeriodId}.pdf`);
+      showSuccess("PDF descargado correctamente con todas las tareas");
+    } catch (error) {
+      console.error(error);
+      showError("Hubo un error al generar el PDF");
+    } finally {
+      if (listContainer) {
+        listContainer.style.maxHeight = "";
+        listContainer.style.overflow = "";
+      }
+      setIsGeneratingPdf(false);
+    }
+  };
 
   if (clientLoading || recordsLoading) return <div className="min-h-screen flex items-center justify-center bg-[#F4F5F8]"><Loader2 className="h-10 w-10 animate-spin text-[#D9E021]" /></div>;
   if (!client) return <div className="min-h-screen p-10 text-center text-slate-600 font-medium">Cliente eliminado o sin acceso.</div>;
@@ -156,7 +206,28 @@ export default function ClientView() {
 
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
           <ClientOverview records={filteredRecords} monthlyHours={clientHours} typeLabels={typeLabelsMap} onUpdateClientNote={(id, note) => updateClientNote.mutate({ id, client_notes: note })} />
-          {/* Opportunities list... */}
+          
+          {opportunities.length > 0 && (
+            <div className="bg-white border-2 border-[#E32462]/30 rounded-xl p-6 mt-8 shadow-sm relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-1.5 h-full bg-[#E32462]"></div>
+              <h2 className="text-[#E32462] font-bold text-sm mb-4 flex items-center gap-2 uppercase tracking-wide">🚀 Oportunidades de proyectos extra detectadas ({currentPeriodLabel})</h2>
+              <div className="space-y-0 mb-2">
+                {opportunities.map(opp => (
+                  <div key={opp.id} className="py-3 border-b border-slate-100 last:border-0 text-sm text-slate-600 flex justify-between items-start gap-4">
+                    <div>
+                      <strong className="block text-[#2A2B73] mb-1 font-bold">{opp.area}</strong>
+                      {opp.impact}
+                    </div>
+                    {opp.hours > 0 && (
+                      <span className="shrink-0 flex items-center font-bold text-xs text-[#2A2B73] bg-slate-100 px-2 py-1 rounded">
+                        <Clock className="h-3 w-3 mr-1" /> {opp.hours}h estimadas
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="mt-8 pt-8">

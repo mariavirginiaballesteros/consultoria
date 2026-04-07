@@ -47,9 +47,6 @@ export default function ClientAdmin() {
     }
   });
 
-  // ... (El resto del componente ClientAdmin se mantiene idéntico, solo añadí el logout en el header inferior)
-  // Replicando la lógica para no perder funcionalidades...
-
   const clientStartDay = client?.period_start_day || 1;
 
   useEffect(() => {
@@ -116,9 +113,109 @@ export default function ClientAdmin() {
 
   const clientTypes = client?.activity_types ?? DEFAULT_TYPES;
 
-  const handleExportCSV = () => { /* Logic... */ };
-  const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => { /* Logic... */ };
-  const copyClientLink = async () => { /* Logic... */ };
+  const handleExportCSV = () => {
+    const typeLabelsMap = clientTypes.reduce((acc: any, t: any) => ({...acc, [t.value]: t.label}), {});
+    const rows = [['Fecha', 'Tipo', 'Área', 'Horas', 'Impacto', 'Oportunidad No Cubierta', 'Notas']];
+    filteredRecords.forEach(r => {
+      rows.push([
+        r.date, typeLabelsMap[r.type] || r.type, r.area, r.hours.toString(),
+        r.impact, r.opportunity ? 'Sí' : 'No', r.notes || ''
+      ]);
+    });
+    const csvContent = rows.map(e => e.map(cell => `"${cell}"`).join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `reporte-${client?.name.toLowerCase().replace(/\s+/g, '-')}-${selectedPeriodId}.csv`;
+    link.click();
+  };
+
+  const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !client) return;
+
+    const reverseTypeMap = clientTypes.reduce((acc: any, t: any) => {
+      acc[t.label.toLowerCase().trim()] = t.value;
+      return acc;
+    }, {});
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const text = event.target?.result as string;
+      if (!text) return;
+
+      const lines = text.split(/\r?\n/);
+      const newRecords = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        const cols = [];
+        let insideQuote = false;
+        let currentStr = "";
+        
+        for (let j = 0; j < line.length; j++) {
+          if (line[j] === '"') insideQuote = !insideQuote;
+          else if (line[j] === ',' && !insideQuote) { cols.push(currentStr.trim()); currentStr = ""; }
+          else currentStr += line[j];
+        }
+        cols.push(currentStr.trim());
+
+        if (cols.length >= 4 && cols[0]) {
+          const importedLabel = (cols[1] || '').toLowerCase().trim();
+          const typeMap = reverseTypeMap[importedLabel] || clientTypes[0]?.value || 'trabajo';
+          const hoursStr = (cols[3] || '0').replace(',', '.');
+          const parsedHours = parseFloat(hoursStr);
+          const oppStr = (cols[5] || '').toLowerCase().trim();
+          const isOpportunity = oppStr === 'sí' || oppStr === 'si' || oppStr === 'true' || oppStr === 'yes';
+
+          newRecords.push({
+            client_id: clientId,
+            date: cols[0],
+            type: typeMap,
+            area: cols[2] || 'Otros',
+            hours: isNaN(parsedHours) ? 0 : parsedHours,
+            impact: cols[4] || '',
+            opportunity: isOpportunity,
+            notes: cols[6] || ''
+          });
+        }
+      }
+
+      if (newRecords.length > 0) {
+        const { error } = await supabase.from('activities').insert(newRecords);
+        if (!error) {
+          queryClient.invalidateQueries({ queryKey: ['activities', clientId] });
+          showSuccess(`Se importaron ${newRecords.length} actividades correctamente`);
+        } else showError("Error guardando en la base de datos");
+      }
+    };
+    reader.readAsText(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const copyClientLink = async () => {
+    const url = `${window.location.origin}/client/${clientId}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      showSuccess("Enlace copiado. ¡Envíalo a tu cliente!");
+    } catch (err) {
+      const textArea = document.createElement("textarea");
+      textArea.value = url;
+      textArea.style.position = "fixed";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        showSuccess("Enlace copiado. ¡Envíalo a tu cliente!");
+      } catch (e) {
+        showError("No se pudo copiar el enlace por seguridad del navegador.");
+      }
+      document.body.removeChild(textArea);
+    }
+  };
 
   if (clientLoading) return <div className="min-h-screen p-10 text-center font-medium">Cargando datos seguros...</div>;
   if (!client) return <div className="min-h-screen p-10 text-center font-medium">Cliente no encontrado o sin permisos</div>;
@@ -163,7 +260,6 @@ export default function ClientAdmin() {
           </div>
 
           <div className="relative z-10 flex flex-wrap items-center gap-2 w-full lg:w-auto mt-2 lg:mt-0">
-            {/* Omitted for brevity: Select Period and Actions */}
             <div className="flex items-center gap-2 sm:mr-4 bg-black/20 p-1.5 rounded-lg border border-white/10">
               <CalendarDays className="h-4 w-4 text-[#D9E021] ml-2" />
               <select value={selectedPeriodId} onChange={e => setSelectedPeriodId(e.target.value)} className="bg-transparent text-white font-bold text-sm outline-none cursor-pointer pr-2 appearance-none">
@@ -175,8 +271,16 @@ export default function ClientAdmin() {
             <Button onClick={() => fileInputRef.current?.click()} variant="outline" size="sm" className="h-9 border-white/20 bg-white/5 text-white hover:bg-white/20 hover:text-white flex-1 sm:flex-none">
               <Upload className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Importar</span>
             </Button>
+            <Button onClick={handleExportCSV} variant="outline" size="sm" className="h-9 border-white/20 bg-white/5 text-white hover:bg-white/20 hover:text-white flex-1 sm:flex-none">
+              <Download className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Exportar Mes</span>
+            </Button>
+            
             <Button onClick={() => window.open(`/client/${clientId}`, '_blank')} variant="outline" size="sm" className="h-9 border-white/20 bg-white/5 text-white hover:bg-white/20 hover:text-white flex-1 sm:flex-none" title="Abrir vista de cliente">
               <ExternalLink className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Ver Vista</span>
+            </Button>
+
+            <Button onClick={copyClientLink} size="sm" className="h-9 bg-[#D9E021] text-[#2A2B73] hover:bg-[#c6cc1b] font-bold flex-1 sm:flex-none">
+              <Copy className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Copiar Link</span>
             </Button>
           </div>
         </header>
@@ -192,7 +296,21 @@ export default function ClientAdmin() {
             <div className="bg-white border-2 border-[#E32462]/30 rounded-xl p-6 mb-8 shadow-sm relative overflow-hidden">
               <div className="absolute top-0 left-0 w-1.5 h-full bg-[#E32462]"></div>
               <h2 className="text-[#E32462] font-bold text-sm mb-4 flex items-center gap-2 uppercase tracking-wide">🚀 Oportunidades de proyectos extra</h2>
-              {/* Opportunities list... */}
+              <div className="space-y-0 mb-2">
+                {opportunities.map(opp => (
+                  <div key={opp.id} className="py-3 border-b border-slate-100 last:border-0 text-sm text-slate-600 flex justify-between items-start gap-4">
+                    <div>
+                      <strong className="block text-[#2A2B73] mb-1 font-bold">{opp.area}</strong>
+                      {opp.impact}
+                    </div>
+                    {opp.hours > 0 && (
+                      <span className="shrink-0 flex items-center font-bold text-xs text-[#2A2B73] bg-slate-100 px-2 py-1 rounded">
+                        <Clock className="h-3 w-3 mr-1" /> {opp.hours}h estimadas
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
