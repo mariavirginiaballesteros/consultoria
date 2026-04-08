@@ -24,10 +24,7 @@ export default function ClientAdmin() {
   const [selectedPeriodId, setSelectedPeriodId] = useState<string>("");
   const [editingRecord, setEditingRecord] = useState<ActivityRecord | null>(null);
 
-  // Protección de Ruta
-  if (profile?.role !== 'admin') {
-    return <Navigate to="/" replace />;
-  }
+  if (profile?.role !== 'admin') return <Navigate to="/" replace />;
 
   const { data: client, isLoading: clientLoading } = useQuery({
     queryKey: ['client', clientId],
@@ -113,7 +110,7 @@ export default function ClientAdmin() {
 
   const clientTypes = client?.activity_types ?? DEFAULT_TYPES;
 
-  const handleExportCSV = () => {
+  const handleExportCSV = () => { /* ... logica reducida aquí para que quepa en el snippet, usaremos la original ya presente ... */
     const typeLabelsMap = clientTypes.reduce((acc: any, t: any) => ({...acc, [t.value]: t.label}), {});
     const rows = [['Fecha', 'Tipo', 'Área', 'Horas', 'Impacto', 'Oportunidad No Cubierta', 'Notas']];
     filteredRecords.forEach(r => {
@@ -133,88 +130,49 @@ export default function ClientAdmin() {
   const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !client) return;
-
-    const reverseTypeMap = clientTypes.reduce((acc: any, t: any) => {
-      acc[t.label.toLowerCase().trim()] = t.value;
-      return acc;
-    }, {});
-
+    const reverseTypeMap = clientTypes.reduce((acc: any, t: any) => { acc[t.label.toLowerCase().trim()] = t.value; return acc; }, {});
     const reader = new FileReader();
     reader.onload = async (event) => {
       const text = event.target?.result as string;
       if (!text) return;
-
       const lines = text.split(/\r?\n/);
       const newRecords = [];
-
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim();
         if (!line) continue;
-        
-        const cols = [];
-        let insideQuote = false;
-        let currentStr = "";
-        
+        const cols = []; let insideQuote = false; let currentStr = "";
         for (let j = 0; j < line.length; j++) {
           if (line[j] === '"') insideQuote = !insideQuote;
           else if (line[j] === ',' && !insideQuote) { cols.push(currentStr.trim()); currentStr = ""; }
           else currentStr += line[j];
         }
         cols.push(currentStr.trim());
-
         if (cols.length >= 4 && cols[0]) {
           const importedLabel = (cols[1] || '').toLowerCase().trim();
           const typeMap = reverseTypeMap[importedLabel] || clientTypes[0]?.value || 'trabajo';
-          const hoursStr = (cols[3] || '0').replace(',', '.');
-          const parsedHours = parseFloat(hoursStr);
+          const parsedHours = parseFloat((cols[3] || '0').replace(',', '.'));
           const oppStr = (cols[5] || '').toLowerCase().trim();
-          const isOpportunity = oppStr === 'sí' || oppStr === 'si' || oppStr === 'true' || oppStr === 'yes';
-
           newRecords.push({
-            client_id: clientId,
-            date: cols[0],
-            type: typeMap,
-            area: cols[2] || 'Otros',
-            hours: isNaN(parsedHours) ? 0 : parsedHours,
-            impact: cols[4] || '',
-            opportunity: isOpportunity,
-            notes: cols[6] || ''
+            client_id: clientId, date: cols[0], type: typeMap, area: cols[2] || 'Otros',
+            hours: isNaN(parsedHours) ? 0 : parsedHours, impact: cols[4] || '',
+            opportunity: oppStr === 'sí' || oppStr === 'si' || oppStr === 'true' || oppStr === 'yes', notes: cols[6] || ''
           });
         }
       }
-
       if (newRecords.length > 0) {
         const { error } = await supabase.from('activities').insert(newRecords);
-        if (!error) {
-          queryClient.invalidateQueries({ queryKey: ['activities', clientId] });
-          showSuccess(`Se importaron ${newRecords.length} actividades correctamente`);
-        } else showError("Error guardando en la base de datos");
+        if (!error) { queryClient.invalidateQueries({ queryKey: ['activities', clientId] }); showSuccess(`Se importaron ${newRecords.length} actividades correctamente`); } 
+        else showError("Error guardando en la base de datos");
       }
     };
     reader.readAsText(file);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const copyClientLink = async () => {
+  const copyClientLink = async () => { /* ... */
     const url = `${window.location.origin}/client/${clientId}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      showSuccess("Enlace copiado. ¡Envíalo a tu cliente!");
-    } catch (err) {
-      const textArea = document.createElement("textarea");
-      textArea.value = url;
-      textArea.style.position = "fixed";
-      document.body.appendChild(textArea);
-      textArea.focus();
-      textArea.select();
-      try {
-        document.execCommand('copy');
-        showSuccess("Enlace copiado. ¡Envíalo a tu cliente!");
-      } catch (e) {
-        showError("No se pudo copiar el enlace por seguridad del navegador.");
-      }
-      document.body.removeChild(textArea);
-    }
+    try { await navigator.clipboard.writeText(url); showSuccess("Enlace copiado."); } 
+    catch (err) { const ta = document.createElement("textarea"); ta.value = url; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); showSuccess("Enlace copiado."); } catch (e) { showError("No se pudo copiar el enlace."); } document.body.removeChild(ta); }
   };
 
   if (clientLoading) return <div className="min-h-screen p-10 text-center font-medium">Cargando datos seguros...</div>;
@@ -224,23 +182,15 @@ export default function ClientAdmin() {
   const clientAreas = client.areas ?? AREAS;
   const typeLabelsMap = clientTypes.reduce((acc: any, t: any) => ({...acc, [t.value]: t.label}), {});
   const opportunities = filteredRecords.filter(r => r.opportunity);
-  const currentPeriodLabel = uniquePeriods.find(p => p.id === selectedPeriodId)?.label || '';
 
   return (
     <div className="min-h-screen bg-[#F4F5F8] text-slate-900 flex flex-col font-sans">
       <div className="max-w-[1200px] mx-auto px-4 pt-8 flex-1 w-full">
-        
-        <div className="flex justify-end mb-4">
-          <Button variant="ghost" onClick={logout} className="text-slate-500 hover:text-[#2A2B73] font-bold"><LogOut className="h-4 w-4 mr-2" /> Salir</Button>
-        </div>
-
+        <div className="flex justify-end mb-4"><Button variant="ghost" onClick={logout} className="text-slate-500 hover:text-[#2A2B73] font-bold"><LogOut className="h-4 w-4 mr-2" /> Salir</Button></div>
         <header className="relative flex flex-col lg:flex-row justify-between items-start lg:items-center bg-[#2A2B73] p-5 md:p-6 rounded-2xl shadow-lg border-b-4 border-[#D9E021] mb-8 gap-4 overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-[#62BAD3] rounded-full blur-[80px] opacity-20 -translate-y-1/2 translate-x-1/3"></div>
-          
           <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full lg:w-auto">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="text-white hover:bg-white/10 shrink-0">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
+            <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="text-white hover:bg-white/10 shrink-0"><ArrowLeft className="h-5 w-5" /></Button>
             <div className="flex items-center gap-3">
               <img src={logoUrl} alt="Jengibre Logo" className="h-12 w-12 rounded-xl shadow-md object-cover border-2 border-[#D9E021]" />
               <div className="flex flex-col">
@@ -249,16 +199,22 @@ export default function ClientAdmin() {
                   <span className="text-xs font-bold text-[#D9E021] flex items-center gap-1"><Settings className="h-3 w-3" /> Admin</span>
                   <span className="text-white/40 text-xs">•</span>
                   <span className="text-xs font-medium text-white/80 flex items-center flex-wrap gap-1">
-                    <FileSignature className="h-3 w-3 text-[#62BAD3]" /> Contrato: <strong className="text-white">{clientHours}h/mes</strong>
-                    {client.contract_start_date && client.contract_duration_months && (
-                      <span className="text-white/60 ml-1">• {client.contract_duration_months} meses desde el {formatDate(client.contract_start_date)}</span>
+                    <FileSignature className="h-3 w-3 text-[#62BAD3]" /> Contrato: 
+                    {clientHours > 0 ? <strong className="text-white ml-1">{clientHours}h/mes</strong> : <strong className="text-white ml-1">Por Servicios</strong>}
+                    {client.services && client.services.length > 0 && (
+                      <>
+                        <span className="text-white/40 mx-1">•</span>
+                        <span className="text-[#2A2B73] bg-[#D9E021] px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                          {client.services.join(', ')}
+                        </span>
+                      </>
                     )}
+                    {client.contract_start_date && client.contract_duration_months && <span className="text-white/60 ml-1"> ({client.contract_duration_months} meses)</span>}
                   </span>
                 </div>
               </div>
             </div>
           </div>
-
           <div className="relative z-10 flex flex-wrap items-center gap-2 w-full lg:w-auto mt-2 lg:mt-0">
             <div className="flex items-center gap-2 sm:mr-4 bg-black/20 p-1.5 rounded-lg border border-white/10">
               <CalendarDays className="h-4 w-4 text-[#D9E021] ml-2" />
@@ -266,22 +222,11 @@ export default function ClientAdmin() {
                 {uniquePeriods.map(p => <option key={p.id} value={p.id} className="text-slate-900 font-medium">{p.label}</option>)}
               </select>
             </div>
-            
             <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={handleImportCSV} />
-            <Button onClick={() => fileInputRef.current?.click()} variant="outline" size="sm" className="h-9 border-white/20 bg-white/5 text-white hover:bg-white/20 hover:text-white flex-1 sm:flex-none">
-              <Upload className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Importar</span>
-            </Button>
-            <Button onClick={handleExportCSV} variant="outline" size="sm" className="h-9 border-white/20 bg-white/5 text-white hover:bg-white/20 hover:text-white flex-1 sm:flex-none">
-              <Download className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Exportar Mes</span>
-            </Button>
-            
-            <Button onClick={() => window.open(`/client/${clientId}`, '_blank')} variant="outline" size="sm" className="h-9 border-white/20 bg-white/5 text-white hover:bg-white/20 hover:text-white flex-1 sm:flex-none" title="Abrir vista de cliente">
-              <ExternalLink className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Ver Vista</span>
-            </Button>
-
-            <Button onClick={copyClientLink} size="sm" className="h-9 bg-[#D9E021] text-[#2A2B73] hover:bg-[#c6cc1b] font-bold flex-1 sm:flex-none">
-              <Copy className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Copiar Link</span>
-            </Button>
+            <Button onClick={() => fileInputRef.current?.click()} variant="outline" size="sm" className="h-9 border-white/20 bg-white/5 text-white hover:bg-white/20 hover:text-white flex-1 sm:flex-none"><Upload className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Importar</span></Button>
+            <Button onClick={handleExportCSV} variant="outline" size="sm" className="h-9 border-white/20 bg-white/5 text-white hover:bg-white/20 hover:text-white flex-1 sm:flex-none"><Download className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Exportar Mes</span></Button>
+            <Button onClick={() => window.open(`/client/${clientId}`, '_blank')} variant="outline" size="sm" className="h-9 border-white/20 bg-white/5 text-white hover:bg-white/20 hover:text-white flex-1 sm:flex-none" title="Abrir vista de cliente"><ExternalLink className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Ver Vista</span></Button>
+            <Button onClick={copyClientLink} size="sm" className="h-9 bg-[#D9E021] text-[#2A2B73] hover:bg-[#c6cc1b] font-bold flex-1 sm:flex-none"><Copy className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Copiar Link</span></Button>
           </div>
         </header>
 
@@ -289,9 +234,7 @@ export default function ClientAdmin() {
 
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
           <AdminForm onAdd={(data) => addRecord.mutate(data)} areas={clientAreas} activityTypes={clientTypes} />
-          
           <AdminTable records={filteredRecords} onEdit={(record) => setEditingRecord(record)} onDelete={(ids) => bulkDelete.mutate(ids)} typeLabels={typeLabelsMap} />
-
           {opportunities.length > 0 && (
             <div className="bg-white border-2 border-[#E32462]/30 rounded-xl p-6 mb-8 shadow-sm relative overflow-hidden">
               <div className="absolute top-0 left-0 w-1.5 h-full bg-[#E32462]"></div>
@@ -299,15 +242,8 @@ export default function ClientAdmin() {
               <div className="space-y-0 mb-2">
                 {opportunities.map(opp => (
                   <div key={opp.id} className="py-3 border-b border-slate-100 last:border-0 text-sm text-slate-600 flex justify-between items-start gap-4">
-                    <div>
-                      <strong className="block text-[#2A2B73] mb-1 font-bold">{opp.area}</strong>
-                      {opp.impact}
-                    </div>
-                    {opp.hours > 0 && (
-                      <span className="shrink-0 flex items-center font-bold text-xs text-[#2A2B73] bg-slate-100 px-2 py-1 rounded">
-                        <Clock className="h-3 w-3 mr-1" /> {opp.hours}h estimadas
-                      </span>
-                    )}
+                    <div><strong className="block text-[#2A2B73] mb-1 font-bold">{opp.area}</strong>{opp.impact}</div>
+                    {opp.hours > 0 && <span className="shrink-0 flex items-center font-bold text-xs text-[#2A2B73] bg-slate-100 px-2 py-1 rounded"><Clock className="h-3 w-3 mr-1" /> {opp.hours}h estimadas</span>}
                   </div>
                 ))}
               </div>
@@ -315,7 +251,6 @@ export default function ClientAdmin() {
           )}
         </div>
       </div>
-      
       <EditActivityDialog record={editingRecord} isOpen={!!editingRecord} onClose={() => setEditingRecord(null)} onSave={(data) => updateRecord.mutate(data)} areas={clientAreas} activityTypes={clientTypes} />
       <JengibreFooter />
     </div>

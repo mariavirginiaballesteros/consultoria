@@ -1,3 +1,4 @@
+// ... keeping existing imports
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -13,15 +14,7 @@ interface ClientOverviewProps {
   onUpdateClientNote: (id: string, note: string) => void;
 }
 
-function ActivityCard({ 
-  r, 
-  typeLabels, 
-  onUpdateClientNote 
-}: { 
-  r: ActivityRecord; 
-  typeLabels: Record<string, string>; 
-  onUpdateClientNote: (id: string, note: string) => void 
-}) {
+function ActivityCard({ r, typeLabels, onUpdateClientNote }: { r: ActivityRecord; typeLabels: Record<string, string>; onUpdateClientNote: (id: string, note: string) => void }) {
   const [isEditing, setIsEditing] = useState(false);
   const hasNote = !!r.client_notes && r.client_notes.trim().length > 0;
 
@@ -36,7 +29,6 @@ function ActivityCard({
 
   return (
     <div className="p-5 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col gap-4 transition-all hover:shadow-md">
-      {/* Cabecera */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 pb-3">
         <div className="flex flex-wrap items-center gap-3">
           <span className="flex items-center text-sm font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-md whitespace-nowrap">
@@ -55,7 +47,6 @@ function ActivityCard({
         </span>
       </div>
 
-      {/* Contenido principal */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <h4 className="text-xs font-bold uppercase text-slate-400 mb-1.5">Impacto / Entregable</h4>
@@ -69,15 +60,9 @@ function ActivityCard({
         )}
       </div>
 
-      {/* Sección Observaciones (Cliente) */}
       <div className="mt-1 pt-3 border-t border-slate-100" data-html2canvas-ignore>
         {!hasNote && !isEditing ? (
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => setIsEditing(true)} 
-            className="text-[#62BAD3] hover:bg-[#62BAD3]/10 hover:text-[#62BAD3] h-8 px-3 text-xs font-bold"
-          >
+          <Button variant="ghost" size="sm" onClick={() => setIsEditing(true)} className="text-[#62BAD3] hover:bg-[#62BAD3]/10 hover:text-[#62BAD3] h-8 px-3 text-xs font-bold">
             <MessageSquare className="h-3.5 w-3.5 mr-1.5" /> Añadir observación / feedback
           </Button>
         ) : (
@@ -87,17 +72,11 @@ function ActivityCard({
                 <MessageSquare className="h-4 w-4" /> Tus observaciones
               </h4>
               {hasNote && !isEditing && (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => setIsEditing(true)} 
-                  className="h-6 px-2 text-xs text-slate-400 hover:text-[#62BAD3]"
-                >
+                <Button variant="ghost" size="sm" onClick={() => setIsEditing(true)} className="h-6 px-2 text-xs text-slate-400 hover:text-[#62BAD3]">
                   <Pencil className="h-3 w-3 mr-1" /> Editar
                 </Button>
               )}
             </div>
-            
             {isEditing ? (
               <div className="animate-in fade-in slide-in-from-top-1 duration-200">
                 <Textarea
@@ -126,7 +105,6 @@ function ActivityCard({
         )}
       </div>
       
-      {/* Notas cliente visibles exclusivamente en el PDF */}
       {hasNote && (
         <div className="hidden mt-2 pt-3 border-t border-slate-100" data-html2canvas-show style={{ display: 'none' }}>
           <h4 className="text-xs font-bold uppercase text-[#62BAD3] mb-1.5">Observaciones del cliente</h4>
@@ -140,24 +118,37 @@ function ActivityCard({
 export function ClientOverview({ records, monthlyHours, typeLabels, onUpdateClientNote }: ClientOverviewProps) {
   const regularRecords = records.filter(r => !r.opportunity);
   const totalHours = regularRecords.reduce((sum, r) => sum + r.hours, 0);
-  const percentage = Math.min((totalHours / monthlyHours) * 100, 100);
-  const isOverBudget = totalHours > monthlyHours;
+  
+  const percentage = monthlyHours > 0 ? Math.min((totalHours / monthlyHours) * 100, 100) : 0;
+  const isOverBudget = monthlyHours > 0 ? totalHours > monthlyHours : false;
 
   return (
     <div className="space-y-6">
-      <Card className="shadow-md border-slate-100 rounded-xl overflow-hidden">
-        <CardContent className="p-6">
-          <h2 className="text-sm font-bold mb-3 text-[#2A2B73] uppercase tracking-wide">Consumo mensual</h2>
-          <div className="flex justify-between text-sm mb-3">
-            <span className="text-slate-500 font-medium">Progreso</span>
-            <span className="font-bold text-[#2A2B73]">{totalHours}/{monthlyHours}h ({Math.round(percentage)}%)</span>
-          </div>
-          <Progress 
-            value={percentage} 
-            className={`h-3 bg-[#2A2B73]/10 ${isOverBudget ? '[&>div]:bg-[#E32462]' : '[&>div]:bg-[#D9E021]'}`} 
-          />
-        </CardContent>
-      </Card>
+      {monthlyHours > 0 ? (
+        <Card className="shadow-md border-slate-100 rounded-xl overflow-hidden">
+          <CardContent className="p-6">
+            <h2 className="text-sm font-bold mb-3 text-[#2A2B73] uppercase tracking-wide">Consumo mensual</h2>
+            <div className="flex justify-between text-sm mb-3">
+              <span className="text-slate-500 font-medium">Progreso</span>
+              <span className="font-bold text-[#2A2B73]">{totalHours}/{monthlyHours}h ({Math.round(percentage)}%)</span>
+            </div>
+            <Progress 
+              value={percentage} 
+              className={`h-3 bg-[#2A2B73]/10 ${isOverBudget ? '[&>div]:bg-[#E32462]' : '[&>div]:bg-[#D9E021]'}`} 
+            />
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="shadow-md border-slate-100 rounded-xl overflow-hidden bg-slate-50/50">
+          <CardContent className="p-6 flex justify-between items-center">
+            <div>
+              <h2 className="text-sm font-bold mb-1 text-[#2A2B73] uppercase tracking-wide">Horas Invertidas</h2>
+              <p className="text-xs text-slate-500 font-medium">Contrato sujeto a servicios (sin límite predefinido)</p>
+            </div>
+            <div className="text-3xl font-black text-[#62BAD3]">{totalHours}h</div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="shadow-md border-slate-100 rounded-xl">
         <CardContent className="p-6">
