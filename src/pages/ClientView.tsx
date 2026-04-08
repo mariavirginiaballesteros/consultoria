@@ -79,32 +79,50 @@ export default function ClientView() {
 
   const generatePDF = async () => {
     const element = document.getElementById("pdf-content");
-    const listContainer = document.getElementById("activity-list-container");
     if (!element) return;
+    
     setIsGeneratingPdf(true);
-    if (listContainer) { listContainer.style.maxHeight = "none"; listContainer.style.overflow = "visible"; }
-    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Set rendering attribute to apply specific print CSS rules
+    element.setAttribute("data-rendering", "true");
+    
+    // Give DOM time to reflow and apply the print styles (expand containers, hide buttons)
+    await new Promise(resolve => setTimeout(resolve, 600));
+    
     try {
-      const canvas = await html2canvas(element, { scale: 2, useCORS: true, logging: false, backgroundColor: "#F4F5F8" });
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      let heightLeft = pdfHeight;
-      let position = 0;
-      pdf.addImage(imgData, "PNG", 0, position, pdfWidth, pdfHeight);
-      heightLeft -= pageHeight;
-      while (heightLeft > 0) {
-        position = heightLeft - pdfHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, pdfWidth, pdfHeight);
-        heightLeft -= pageHeight;
-      }
+      // Usamos windowWidth de 1200 para forzar diseño de computadora aunque estén en un móvil
+      const canvas = await html2canvas(element, { 
+        scale: 2, 
+        useCORS: true, 
+        logging: false, 
+        backgroundColor: "#F4F5F8",
+        windowWidth: 1200
+      });
+      
+      const imgData = canvas.toDataURL("image/jpeg", 0.95);
+      
+      // Creamos un PDF de UNA SOLA PÁGINA (Página continua). 
+      // Esto previene los cortes horribles a la mitad del texto.
+      const pdfWidth = canvas.width / 2; 
+      const pdfHeight = canvas.height / 2;
+      
+      const pdf = new jsPDF({ 
+        orientation: "portrait", 
+        unit: "px", 
+        format: [pdfWidth, pdfHeight] 
+      });
+      
+      pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
       pdf.save(`Reporte_Jengibre_${client?.name.replace(/\s+/g, '_')}_${selectedPeriodId}.pdf`);
-      showSuccess("PDF descargado correctamente con todas las tareas");
-    } catch (error) { console.error(error); showError("Hubo un error al generar el PDF"); } 
-    finally { if (listContainer) { listContainer.style.maxHeight = ""; listContainer.style.overflow = ""; } setIsGeneratingPdf(false); }
+      
+      showSuccess("PDF descargado correctamente");
+    } catch (error) { 
+      console.error(error); 
+      showError("Hubo un error al generar el PDF"); 
+    } finally { 
+      element.removeAttribute("data-rendering");
+      setIsGeneratingPdf(false); 
+    }
   };
 
   if (clientLoading || recordsLoading) return <div className="min-h-screen flex items-center justify-center bg-[#F4F5F8]"><Loader2 className="h-10 w-10 animate-spin text-[#D9E021]" /></div>;
@@ -135,7 +153,7 @@ export default function ClientView() {
         </Button>
       </div>
 
-      <div id="pdf-content" className="max-w-[1200px] mx-auto px-4 pt-16 flex-1 w-full bg-[#F4F5F8] pb-10">
+      <div id="pdf-content" className="max-w-[1200px] mx-auto px-4 pt-16 flex-1 w-full bg-[#F4F5F8] pb-10 transition-all duration-300">
         <header className="relative flex flex-col md:flex-row justify-between items-start md:items-center bg-[#2A2B73] p-6 md:p-8 rounded-2xl shadow-xl border-b-4 border-[#D9E021] mb-8 gap-4 overflow-hidden">
           <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-[#E32462] rounded-full blur-[80px] opacity-20"></div>
           
@@ -180,7 +198,26 @@ export default function ClientView() {
           </div>
         </header>
 
-        <style dangerouslySetInnerHTML={{__html: `#pdf-content[data-rendering="true"] [data-html2canvas-ignore] { display: none !important; } #pdf-content[data-rendering="true"] [data-html2canvas-show] { display: block !important; }`}} />
+        {/* Estilos especiales para el momento de la captura del PDF */}
+        <style dangerouslySetInnerHTML={{__html: `
+          #pdf-content[data-rendering="true"] { 
+            padding: 40px !important; 
+            background-color: #F4F5F8 !important; 
+            width: 1200px !important; 
+            max-width: 1200px !important; 
+            margin: 0 auto !important;
+          }
+          #pdf-content[data-rendering="true"] .overflow-y-auto { 
+            max-height: none !important; 
+            overflow: visible !important; 
+          }
+          #pdf-content[data-rendering="true"] [data-html2canvas-ignore] { 
+            display: none !important; 
+          }
+          #pdf-content[data-rendering="true"] [data-html2canvas-show] { 
+            display: block !important; 
+          }
+        `}} />
 
         {(client.proposal_url || invoices.length > 0) && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8" data-html2canvas-ignore>
