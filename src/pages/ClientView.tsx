@@ -1,13 +1,14 @@
 import { useState, useMemo, useEffect } from "react";
-import { useParams, Navigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/components/AuthProvider";
 import { MetricsCards } from "@/components/consulting/MetricsCards";
 import { ClientOverview } from "@/components/consulting/ClientOverview";
 import { ActivityRecord, MONTHLY_BUDGET, DEFAULT_TYPES, getPeriodInfo, formatDate } from "@/lib/consulting-data";
-import { Loader2, FileDown, CalendarDays, Clock, FileSignature, LogOut } from "lucide-react";
+import { Loader2, FileDown, CalendarDays, Clock, FileSignature, LogOut, FileText, Receipt, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { JengibreFooter } from "@/components/JengibreFooter";
 import { showSuccess, showError } from "@/utils/toast";
 import html2canvas from "html2canvas";
@@ -17,20 +18,10 @@ import logoUrl from "@/assets/logo.jpg";
 export default function ClientView() {
   const { clientId } = useParams();
   const queryClient = useQueryClient();
-  const { profile, logout } = useAuth();
+  const { session, logout } = useAuth();
   
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [selectedPeriodId, setSelectedPeriodId] = useState<string>("");
-
-  if (profile?.role === 'client' && profile?.client_id !== clientId) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F4F5F8]">
-        <h1 className="text-2xl font-bold text-[#E32462] mb-4">Acceso Denegado</h1>
-        <p className="text-slate-600 mb-6">No tienes permisos para ver el reporte de esta empresa.</p>
-        <Button onClick={logout} className="bg-[#2A2B73]">Cerrar sesión e intentar con otra cuenta</Button>
-      </div>
-    );
-  }
 
   const { data: client, isLoading: clientLoading } = useQuery({
     queryKey: ['client', clientId],
@@ -117,21 +108,24 @@ export default function ClientView() {
   };
 
   if (clientLoading || recordsLoading) return <div className="min-h-screen flex items-center justify-center bg-[#F4F5F8]"><Loader2 className="h-10 w-10 animate-spin text-[#D9E021]" /></div>;
-  if (!client) return <div className="min-h-screen p-10 text-center text-slate-600 font-medium">Cliente eliminado o sin acceso.</div>;
+  if (!client) return <div className="min-h-screen p-10 text-center text-slate-600 font-medium">El reporte de esta empresa no está disponible o el enlace es incorrecto.</div>;
 
   const clientHours = client.monthly_hours ?? MONTHLY_BUDGET;
   const clientTypes = client.activity_types ?? DEFAULT_TYPES;
   const typeLabelsMap = clientTypes.reduce((acc: any, t: any) => ({...acc, [t.value]: t.label}), {});
   const currentPeriodLabel = uniquePeriods.find(p => p.id === selectedPeriodId)?.label || '';
+  const invoices = client.invoices || [];
 
   return (
     <div className="min-h-screen bg-[#F4F5F8] text-slate-900 flex flex-col font-sans selection:bg-[#62BAD3]/30">
       
-      <div className="absolute top-4 right-4 z-50">
-        <Button variant="outline" onClick={logout} className="bg-white/80 backdrop-blur-md text-slate-700 shadow-sm border-slate-200 hover:bg-white font-bold" data-html2canvas-ignore>
-          <LogOut className="h-4 w-4 mr-2" /> Cerrar Sesión
-        </Button>
-      </div>
+      {session && (
+        <div className="absolute top-4 right-4 z-50">
+          <Button variant="outline" onClick={logout} className="bg-white/80 backdrop-blur-md text-slate-700 shadow-sm border-slate-200 hover:bg-white font-bold" data-html2canvas-ignore>
+            <LogOut className="h-4 w-4 mr-2" /> Modo Admin (Salir)
+          </Button>
+        </div>
+      )}
 
       <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2" data-html2canvas-ignore>
         <Button onClick={generatePDF} disabled={isGeneratingPdf} className="bg-[#E32462] hover:bg-[#c21d51] text-white shadow-xl rounded-full h-14 px-6 font-bold text-base flex items-center gap-2 transition-transform hover:scale-105">
@@ -186,6 +180,48 @@ export default function ClientView() {
         </header>
 
         <style dangerouslySetInnerHTML={{__html: `#pdf-content[data-rendering="true"] [data-html2canvas-ignore] { display: none !important; } #pdf-content[data-rendering="true"] [data-html2canvas-show] { display: block !important; }`}} />
+
+        {(client.proposal_url || invoices.length > 0) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8" data-html2canvas-ignore>
+            {client.proposal_url && (
+              <Card className="shadow-sm border-slate-100 rounded-xl overflow-hidden hover:shadow-md transition-shadow">
+                <CardContent className="p-5 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-[#D9E021]/20 p-2.5 rounded-lg"><FileText className="h-5 w-5 text-[#2A2B73]" /></div>
+                    <div>
+                      <h3 className="font-bold text-[#2A2B73] text-sm">Propuesta Comercial</h3>
+                      <p className="text-xs text-slate-500 font-medium">Ver documento de términos pactados</p>
+                    </div>
+                  </div>
+                  <Button variant="outline" size="sm" className="font-bold text-[#62BAD3] border-[#62BAD3]/30 hover:bg-[#62BAD3]/10" onClick={() => window.open(client.proposal_url, '_blank')}>
+                    <ExternalLink className="h-4 w-4 mr-2" /> Abrir
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {invoices.length > 0 && (
+              <Card className="shadow-sm border-slate-100 rounded-xl overflow-hidden hover:shadow-md transition-shadow">
+                <CardContent className="p-5">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="bg-[#62BAD3]/20 p-2.5 rounded-lg"><Receipt className="h-5 w-5 text-[#2A2B73]" /></div>
+                    <h3 className="font-bold text-[#2A2B73] text-sm">Facturas Disponibles</h3>
+                  </div>
+                  <div className="space-y-2 max-h-[120px] overflow-y-auto pr-2">
+                    {invoices.map((inv: any, idx: number) => (
+                      <div key={idx} className="flex justify-between items-center text-sm p-2 bg-slate-50 rounded-md border border-slate-100">
+                        <span className="font-bold text-slate-700 truncate max-w-[200px]">{inv.name}</span>
+                        <a href={inv.url} target="_blank" rel="noreferrer" className="text-[#62BAD3] hover:text-[#4a9bb2] font-bold text-xs flex items-center">
+                          <FileDown className="h-3 w-3 mr-1" /> Descargar
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
 
         <MetricsCards records={filteredRecords} isClientView={true} monthlyHours={clientHours} />
 

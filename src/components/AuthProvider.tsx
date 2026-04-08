@@ -57,6 +57,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
   };
 
+  const isPublicRoute = window.location.pathname.startsWith('/client/');
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F4F5F8] flex flex-col items-center justify-center">
@@ -66,7 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!session) return <Login />;
+  if (!session && !isPublicRoute) return <Login />;
 
   return (
     <AuthContext.Provider value={{ session, profile, logout }}>

@@ -3,8 +3,9 @@ import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/components/AuthProvider";
-import { ArrowLeft, Copy, Download, Upload, Settings, CalendarDays, Clock, ExternalLink, FileSignature, LogOut } from "lucide-react";
+import { ArrowLeft, Copy, Download, Upload, Settings, CalendarDays, Clock, ExternalLink, FileSignature, LogOut, FileText, Receipt, Trash2, Loader2, UploadCloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { MetricsCards } from "@/components/consulting/MetricsCards";
 import { AdminForm } from "@/components/consulting/AdminForm";
 import { AdminTable } from "@/components/consulting/AdminTable";
@@ -20,9 +21,13 @@ export default function ClientAdmin() {
   const queryClient = useQueryClient();
   const { profile, logout } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const proposalInputRef = useRef<HTMLInputElement>(null);
+  const invoiceInputRef = useRef<HTMLInputElement>(null);
 
   const [selectedPeriodId, setSelectedPeriodId] = useState<string>("");
   const [editingRecord, setEditingRecord] = useState<ActivityRecord | null>(null);
+  const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
 
   if (profile?.role !== 'admin') return <Navigate to="/" replace />;
 
@@ -44,6 +49,19 @@ export default function ClientAdmin() {
     }
   });
 
+  const updateClientDocs = useMutation({
+    mutationFn: async (clientData: any) => {
+      const { data, error } = await supabase.from('clients').update(clientData).eq('id', clientId).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['client', clientId] });
+      showSuccess("Documento actualizado correctamente");
+    },
+    onError: () => showError("Error al actualizar documentos")
+  });
+
   const clientStartDay = client?.period_start_day || 1;
 
   useEffect(() => {
@@ -63,8 +81,7 @@ export default function ClientAdmin() {
       queryClient.invalidateQueries({ queryKey: ['activities', clientId] });
       const recordPeriod = getPeriodInfo(data.date, clientStartDay);
       if (recordPeriod.id !== selectedPeriodId) setSelectedPeriodId(recordPeriod.id);
-    },
-    onError: () => showError("Error al guardar la actividad")
+    }
   });
 
   const updateRecord = useMutation({
@@ -80,8 +97,7 @@ export default function ClientAdmin() {
       showSuccess("Actividad actualizada correctamente");
       const recordPeriod = getPeriodInfo(data.date, clientStartDay);
       if (recordPeriod.id !== selectedPeriodId) setSelectedPeriodId(recordPeriod.id);
-    },
-    onError: () => showError("Error al actualizar la actividad")
+    }
   });
 
   const bulkDelete = useMutation({
@@ -110,7 +126,7 @@ export default function ClientAdmin() {
 
   const clientTypes = client?.activity_types ?? DEFAULT_TYPES;
 
-  const handleExportCSV = () => { /* ... logica reducida aquí para que quepa en el snippet, usaremos la original ya presente ... */
+  const handleExportCSV = () => {
     const typeLabelsMap = clientTypes.reduce((acc: any, t: any) => ({...acc, [t.value]: t.label}), {});
     const rows = [['Fecha', 'Tipo', 'Área', 'Horas', 'Impacto', 'Oportunidad No Cubierta', 'Notas']];
     filteredRecords.forEach(r => {
@@ -169,19 +185,67 @@ export default function ClientAdmin() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const copyClientLink = async () => { /* ... */
+  const copyClientLink = async () => {
     const url = `${window.location.origin}/client/${clientId}`;
     try { await navigator.clipboard.writeText(url); showSuccess("Enlace copiado."); } 
     catch (err) { const ta = document.createElement("textarea"); ta.value = url; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); showSuccess("Enlace copiado."); } catch (e) { showError("No se pudo copiar el enlace."); } document.body.removeChild(ta); }
   };
 
-  if (clientLoading) return <div className="min-h-screen p-10 text-center font-medium">Cargando datos seguros...</div>;
-  if (!client) return <div className="min-h-screen p-10 text-center font-medium">Cliente no encontrado o sin permisos</div>;
+  const uploadFile = async (file: File, prefix: string) => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${prefix}_${clientId}_${Date.now()}.${fileExt}`;
+    const { data, error } = await supabase.storage.from('documents').upload(fileName, file);
+    if (error) throw error;
+    const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(fileName);
+    return { name: file.name, url: publicUrl, date: new Date().toISOString() };
+  };
+
+  const handleUploadProposal = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingDoc('proposal');
+    try {
+      const fileData = await uploadFile(file, 'propuesta');
+      updateClientDocs.mutate({ proposal_url: fileData.url });
+    } catch (err) {
+      showError("Error al subir el archivo (¿Ejecutaste el SQL del bucket?)");
+    } finally {
+      setUploadingDoc(null);
+      if (proposalInputRef.current) proposalInputRef.current.value = '';
+    }
+  };
+
+  const handleUploadInvoice = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingDoc('invoice');
+    try {
+      const fileData = await uploadFile(file, 'factura');
+      const currentInvoices = client?.invoices || [];
+      updateClientDocs.mutate({ invoices: [fileData, ...currentInvoices] });
+    } catch (err) {
+      showError("Error al subir la factura (¿Ejecutaste el SQL del bucket?)");
+    } finally {
+      setUploadingDoc(null);
+      if (invoiceInputRef.current) invoiceInputRef.current.value = '';
+    }
+  };
+
+  const removeInvoice = (index: number) => {
+    if (!window.confirm("¿Quitar esta factura de la lista?")) return;
+    const currentInvoices = [...(client?.invoices || [])];
+    currentInvoices.splice(index, 1);
+    updateClientDocs.mutate({ invoices: currentInvoices });
+  };
+
+  if (clientLoading) return <div className="min-h-screen p-10 text-center font-medium">Cargando datos...</div>;
+  if (!client) return <div className="min-h-screen p-10 text-center font-medium">Cliente no encontrado</div>;
 
   const clientHours = client.monthly_hours ?? MONTHLY_BUDGET;
   const clientAreas = client.areas ?? AREAS;
   const typeLabelsMap = clientTypes.reduce((acc: any, t: any) => ({...acc, [t.value]: t.label}), {});
   const opportunities = filteredRecords.filter(r => r.opportunity);
+  const invoices = client.invoices || [];
 
   return (
     <div className="min-h-screen bg-[#F4F5F8] text-slate-900 flex flex-col font-sans">
@@ -226,11 +290,68 @@ export default function ClientAdmin() {
             <Button onClick={() => fileInputRef.current?.click()} variant="outline" size="sm" className="h-9 border-white/20 bg-white/5 text-white hover:bg-white/20 hover:text-white flex-1 sm:flex-none"><Upload className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Importar</span></Button>
             <Button onClick={handleExportCSV} variant="outline" size="sm" className="h-9 border-white/20 bg-white/5 text-white hover:bg-white/20 hover:text-white flex-1 sm:flex-none"><Download className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Exportar Mes</span></Button>
             <Button onClick={() => window.open(`/client/${clientId}`, '_blank')} variant="outline" size="sm" className="h-9 border-white/20 bg-white/5 text-white hover:bg-white/20 hover:text-white flex-1 sm:flex-none" title="Abrir vista de cliente"><ExternalLink className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Ver Vista</span></Button>
-            <Button onClick={copyClientLink} size="sm" className="h-9 bg-[#D9E021] text-[#2A2B73] hover:bg-[#c6cc1b] font-bold flex-1 sm:flex-none"><Copy className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Copiar Link</span></Button>
+            <Button onClick={copyClientLink} size="sm" className="h-9 bg-[#D9E021] text-[#2A2B73] hover:bg-[#c6cc1b] font-bold flex-1 sm:flex-none"><Copy className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Copiar Link Público</span></Button>
           </div>
         </header>
 
         <MetricsCards records={filteredRecords} isClientView={false} monthlyHours={clientHours} />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+          <Card className="shadow-sm border-slate-100 rounded-xl overflow-hidden">
+            <CardContent className="p-5">
+              <h3 className="font-bold text-[#2A2B73] mb-3 flex items-center gap-2"><FileText className="h-4 w-4 text-[#D9E021]" /> Propuesta Comercial</h3>
+              {client.proposal_url ? (
+                <div className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-100">
+                  <a href={client.proposal_url} target="_blank" rel="noreferrer" className="text-sm font-bold text-[#62BAD3] hover:underline flex items-center">
+                    <ExternalLink className="h-3 w-3 mr-1" /> Ver Propuesta Actual
+                  </a>
+                  <Button variant="ghost" size="sm" className="h-8 text-slate-400 hover:text-[#E32462]" onClick={() => updateClientDocs.mutate({ proposal_url: null })}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="text-sm text-slate-500 bg-slate-50 p-4 rounded-lg border border-dashed border-slate-200 text-center">
+                  No hay propuesta cargada.
+                </div>
+              )}
+              <div className="mt-3">
+                <input type="file" className="hidden" ref={proposalInputRef} onChange={handleUploadProposal} accept=".pdf,.doc,.docx" />
+                <Button variant="outline" className="w-full font-bold text-xs" onClick={() => proposalInputRef.current?.click()} disabled={uploadingDoc === 'proposal'}>
+                  {uploadingDoc === 'proposal' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <UploadCloud className="h-4 w-4 mr-2 text-[#2A2B73]" />} 
+                  {client.proposal_url ? 'Reemplazar archivo' : 'Subir Propuesta'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm border-slate-100 rounded-xl overflow-hidden">
+            <CardContent className="p-5">
+              <h3 className="font-bold text-[#2A2B73] mb-3 flex items-center gap-2"><Receipt className="h-4 w-4 text-[#62BAD3]" /> Facturas Emitidas</h3>
+              <div className="space-y-2 mb-3 max-h-[100px] overflow-y-auto">
+                {invoices.length === 0 ? (
+                  <div className="text-sm text-slate-500 bg-slate-50 p-3 rounded-lg border border-dashed border-slate-200 text-center">Sin facturas registradas.</div>
+                ) : (
+                  invoices.map((inv: any, idx: number) => (
+                    <div key={idx} className="flex items-center justify-between bg-slate-50 p-2 rounded-md border border-slate-100">
+                      <a href={inv.url} target="_blank" rel="noreferrer" className="text-xs font-bold text-[#2A2B73] hover:text-[#62BAD3] truncate max-w-[200px]">
+                        {inv.name}
+                      </a>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-slate-400">{new Date(inv.date).toLocaleDateString()}</span>
+                        <button onClick={() => removeInvoice(idx)} className="text-slate-400 hover:text-[#E32462]"><Trash2 className="h-3 w-3" /></button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+              <input type="file" className="hidden" ref={invoiceInputRef} onChange={handleUploadInvoice} accept=".pdf,.jpg,.jpeg,.png" />
+              <Button variant="outline" className="w-full font-bold text-xs" onClick={() => invoiceInputRef.current?.click()} disabled={uploadingDoc === 'invoice'}>
+                {uploadingDoc === 'invoice' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <UploadCloud className="h-4 w-4 mr-2 text-[#2A2B73]" />} 
+                Añadir Factura
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
 
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
           <AdminForm onAdd={(data) => addRecord.mutate(data)} areas={clientAreas} activityTypes={clientTypes} />

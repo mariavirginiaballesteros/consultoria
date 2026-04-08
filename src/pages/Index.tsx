@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, ArrowRight, Trash2, Copy, DatabaseZap, X, Pencil, LogOut, KeyRound, Loader2 } from "lucide-react";
+import { Plus, ArrowRight, Trash2, Copy, DatabaseZap, X, Pencil, LogOut } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
 import { JengibreFooter } from "@/components/JengibreFooter";
 import { AREAS, DEFAULT_TYPES } from "@/lib/consulting-data";
@@ -22,11 +22,6 @@ export default function Index() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<any>(null);
   
-  const [accessModalClient, setAccessModalClient] = useState<any>(null);
-  const [clientEmail, setClientEmail] = useState('');
-  const [clientPassword, setClientPassword] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
-  
   const [name, setName] = useState("");
   const [monthlyHours, setMonthlyHours] = useState(20);
   const [periodStartDay, setPeriodStartDay] = useState(1);
@@ -36,8 +31,6 @@ export default function Index() {
   const [types, setTypes] = useState(DEFAULT_TYPES);
   const [services, setServices] = useState<string[]>([]);
   
-  const [newArea, setNewArea] = useState("");
-  const [newType, setNewType] = useState("");
   const [newService, setNewService] = useState("");
 
   const { data: clients = [], isLoading, error } = useQuery({
@@ -91,28 +84,6 @@ export default function Index() {
       showSuccess("Cliente eliminado");
     }
   });
-
-  const handleGenerateAccess = async () => {
-    if (!clientEmail || !clientPassword || clientPassword.length < 6) {
-      showError("Ingresa un correo y una contraseña (mín. 6 caracteres)");
-      return;
-    }
-
-    setIsGenerating(true);
-    const { data, error } = await supabase.functions.invoke('create-client-user', {
-      body: { email: clientEmail, password: clientPassword, clientId: accessModalClient.id }
-    });
-    setIsGenerating(false);
-
-    if (error || data?.error) {
-      showError("Error: " + (data?.error || error.message));
-    } else {
-      showSuccess("Usuario generado. Envíale sus credenciales.");
-      setAccessModalClient(null);
-      setClientEmail('');
-      setClientPassword('');
-    }
-  };
 
   const resetForm = () => {
     setEditingClient(null);
@@ -172,7 +143,7 @@ export default function Index() {
     const url = `${window.location.origin}/client/${clientId}`;
     try {
       await navigator.clipboard.writeText(url);
-      showSuccess("Enlace copiado al portapapeles");
+      showSuccess("Enlace de acceso directo copiado al portapapeles");
     } catch (err) {
       const textArea = document.createElement("textarea");
       textArea.value = url; document.body.appendChild(textArea); textArea.select();
@@ -266,20 +237,6 @@ export default function Index() {
               </div>
             </DialogContent>
           </Dialog>
-
-          <Dialog open={!!accessModalClient} onOpenChange={(open) => !open && setAccessModalClient(null)}>
-            <DialogContent className="sm:max-w-[400px]">
-              <DialogHeader><DialogTitle className="text-xl font-black text-[#2A2B73] flex items-center gap-2"><KeyRound className="h-5 w-5 text-[#62BAD3]"/> Generar Acceso</DialogTitle></DialogHeader>
-              <div className="py-4 space-y-4">
-                <p className="text-sm text-slate-600 font-medium">Crear usuario sin validación para: <strong className="text-[#2A2B73]">{accessModalClient?.name}</strong></p>
-                <div className="space-y-2"><Label className="font-bold text-slate-600">Correo Electrónico (Login)</Label><Input value={clientEmail} onChange={e => setClientEmail(e.target.value)} placeholder="cliente@empresa.com" type="email" /></div>
-                <div className="space-y-2"><Label className="font-bold text-slate-600">Contraseña asignada</Label><Input value={clientPassword} onChange={e => setClientPassword(e.target.value)} placeholder="Mínimo 6 caracteres" type="text" /></div>
-                <Button onClick={handleGenerateAccess} disabled={isGenerating} className="w-full mt-2 bg-[#2A2B73] text-white font-bold hover:bg-[#1f2055] shadow-md">
-                  {isGenerating ? <><Loader2 className="h-4 w-4 mr-2 animate-spin"/> Generando...</> : "Crear Credenciales"}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
         </div>
         
         {isLoading ? (
@@ -299,8 +256,7 @@ export default function Index() {
                     </span>
                   </div>
                   <div className="flex items-center flex-wrap gap-2 w-full md:w-auto">
-                    <Button variant="outline" size="sm" onClick={() => setAccessModalClient(client)} className="flex-1 md:flex-none border-slate-200 hover:bg-[#62BAD3]/10 hover:text-[#62BAD3] bg-white font-bold" title="Generar usuario"><KeyRound className="h-4 w-4 mr-2" /> Accesos</Button>
-                    <Button variant="outline" size="sm" onClick={() => copyLink(client.id)} className="flex-1 md:flex-none border-slate-200 hover:bg-[#62BAD3]/10 hover:text-[#62BAD3] font-bold" title="Copiar enlace"><Copy className="h-4 w-4 mr-2" /> Link</Button>
+                    <Button variant="outline" size="sm" onClick={() => copyLink(client.id)} className="flex-1 md:flex-none border-slate-200 hover:bg-[#62BAD3]/10 hover:text-[#62BAD3] font-bold" title="Copiar enlace"><Copy className="h-4 w-4 mr-2" /> Copiar Link Público</Button>
                     <Button onClick={() => navigate(`/admin/${client.id}`)} size="sm" className="flex-1 md:flex-none bg-[#2A2B73] text-white hover:bg-[#1f2055] font-bold">Gestionar <ArrowRight className="h-4 w-4 ml-2" /></Button>
                     <div className="flex border-l border-slate-200 pl-2 ml-1 w-full md:w-auto mt-2 md:mt-0 justify-end">
                       <Button variant="ghost" size="sm" onClick={() => handleOpenEdit(client)} className="text-slate-400 hover:text-[#2A2B73] hover:bg-slate-100 px-2"><Pencil className="h-4 w-4" /></Button>
