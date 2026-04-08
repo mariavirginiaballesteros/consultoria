@@ -111,6 +111,7 @@ export default function ClientView() {
   if (!client) return <div className="min-h-screen p-10 text-center text-slate-600 font-medium">El reporte de esta empresa no está disponible o el enlace es incorrecto.</div>;
 
   const clientHours = client.monthly_hours ?? MONTHLY_BUDGET;
+  const isServiceOnly = clientHours === 0;
   const clientTypes = client.activity_types ?? DEFAULT_TYPES;
   const typeLabelsMap = clientTypes.reduce((acc: any, t: any) => ({...acc, [t.value]: t.label}), {});
   const currentPeriodLabel = uniquePeriods.find(p => p.id === selectedPeriodId)?.label || '';
@@ -146,7 +147,7 @@ export default function ClientView() {
               <div className="flex flex-wrap items-center gap-3 mt-2">
                 <span className="flex flex-wrap items-center text-sm font-medium text-white bg-white/10 px-3 py-1.5 rounded-lg border border-white/5">
                   <FileSignature className="h-4 w-4 mr-2 text-[#62BAD3]" /> Contrato: 
-                  {clientHours > 0 ? <strong className="ml-1 text-white">{clientHours}h mensuales</strong> : <strong className="ml-1 text-white">Por Servicios</strong>}
+                  {!isServiceOnly ? <strong className="ml-1 text-white">{clientHours}h mensuales</strong> : <strong className="ml-1 text-white">Por Servicios</strong>}
                   
                   {client.services && client.services.length > 0 && (
                     <>
@@ -236,7 +237,7 @@ export default function ClientView() {
                 {opportunities.map(opp => (
                   <div key={opp.id} className="py-3 border-b border-slate-100 last:border-0 text-sm text-slate-600 flex justify-between items-start gap-4">
                     <div><strong className="block text-[#2A2B73] mb-1 font-bold">{opp.area}</strong>{opp.impact}</div>
-                    {opp.hours > 0 && <span className="shrink-0 flex items-center font-bold text-xs text-[#2A2B73] bg-slate-100 px-2 py-1 rounded"><Clock className="h-3 w-3 mr-1" /> {opp.hours}h estimadas</span>}
+                    {!isServiceOnly && opp.hours > 0 && <span className="shrink-0 flex items-center font-bold text-xs text-[#2A2B73] bg-slate-100 px-2 py-1 rounded"><Clock className="h-3 w-3 mr-1" /> {opp.hours}h estimadas</span>}
                   </div>
                 ))}
               </div>
