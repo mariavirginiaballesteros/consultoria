@@ -10,9 +10,10 @@ interface AdminTableProps {
   onEdit: (record: ActivityRecord) => void;
   onDelete: (ids: string[]) => void;
   typeLabels: Record<string, string>;
+  isServiceOnly?: boolean;
 }
 
-export function AdminTable({ records, onEdit, onDelete, typeLabels }: AdminTableProps) {
+export function AdminTable({ records, onEdit, onDelete, typeLabels, isServiceOnly }: AdminTableProps) {
   const [selected, setSelected] = useState<string[]>([]);
 
   const getTypeIcon = (type: string) => {
@@ -68,7 +69,7 @@ export function AdminTable({ records, onEdit, onDelete, typeLabels }: AdminTable
             <TableHead className="w-[100px] text-[#2A2B73]">Fecha</TableHead>
             <TableHead className="text-[#2A2B73]">Tipo</TableHead>
             <TableHead className="text-[#2A2B73]">Área</TableHead>
-            <TableHead className="text-center text-[#2A2B73]">Hs</TableHead>
+            {!isServiceOnly && <TableHead className="text-center text-[#2A2B73]">Hs</TableHead>}
             <TableHead className="max-w-[150px] sm:max-w-[250px] text-[#2A2B73]">Impacto</TableHead>
             <TableHead className="text-center text-[#2A2B73]">No cubierto</TableHead>
             <TableHead className="text-right text-[#2A2B73]">Acción</TableHead>
@@ -77,7 +78,7 @@ export function AdminTable({ records, onEdit, onDelete, typeLabels }: AdminTable
         <TableBody>
           {records.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={8} className="text-center text-slate-500 py-10">
+              <TableCell colSpan={isServiceOnly ? 7 : 8} className="text-center text-slate-500 py-10">
                 No hay actividades registradas en este periodo.
               </TableCell>
             </TableRow>
@@ -101,11 +102,13 @@ export function AdminTable({ records, onEdit, onDelete, typeLabels }: AdminTable
                   </div>
                 </TableCell>
                 <TableCell className="text-xs text-slate-600">{r.area}</TableCell>
-                <TableCell className="text-center font-bold text-xs text-[#2A2B73]">
-                  <div className="flex items-center justify-center gap-1">
-                    <Clock className="h-3 w-3" /> {r.hours}h
-                  </div>
-                </TableCell>
+                {!isServiceOnly && (
+                  <TableCell className="text-center font-bold text-xs text-[#2A2B73]">
+                    <div className="flex items-center justify-center gap-1">
+                      <Clock className="h-3 w-3" /> {r.hours}h
+                    </div>
+                  </TableCell>
+                )}
                 <TableCell className="text-xs max-w-[150px] sm:max-w-[250px] truncate text-slate-600" title={r.impact}>{r.impact}</TableCell>
                 <TableCell className="text-center">
                   {r.opportunity && <Check className="h-5 w-5 mx-auto text-[#E32462]" strokeWidth={3} />}

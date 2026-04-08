@@ -14,7 +14,7 @@ interface ClientOverviewProps {
   onUpdateClientNote: (id: string, note: string) => void;
 }
 
-function ActivityCard({ r, typeLabels, onUpdateClientNote }: { r: ActivityRecord; typeLabels: Record<string, string>; onUpdateClientNote: (id: string, note: string) => void }) {
+function ActivityCard({ r, typeLabels, onUpdateClientNote, isServiceOnly }: { r: ActivityRecord; typeLabels: Record<string, string>; onUpdateClientNote: (id: string, note: string) => void; isServiceOnly: boolean }) {
   const [isEditing, setIsEditing] = useState(false);
   const hasNote = !!r.client_notes && r.client_notes.trim().length > 0;
 
@@ -41,10 +41,12 @@ function ActivityCard({ r, typeLabels, onUpdateClientNote }: { r: ActivityRecord
             {getTypeIcon(r.type)} {typeLabels[r.type] || r.type}
           </div>
         </div>
-        <span className="flex items-center text-xl font-black text-[#2A2B73] bg-[#D9E021]/20 px-4 py-1 rounded-lg">
-          <Clock className="h-5 w-5 mr-1.5 text-[#2A2B73]" />
-          {r.hours}h
-        </span>
+        {!isServiceOnly && (
+          <span className="flex items-center text-xl font-black text-[#2A2B73] bg-[#D9E021]/20 px-4 py-1 rounded-lg">
+            <Clock className="h-5 w-5 mr-1.5 text-[#2A2B73]" />
+            {r.hours}h
+          </span>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -119,6 +121,7 @@ export function ClientOverview({ records, monthlyHours, typeLabels, onUpdateClie
   const regularRecords = records.filter(r => !r.opportunity);
   const totalHours = regularRecords.reduce((sum, r) => sum + r.hours, 0);
   
+  const isServiceOnly = monthlyHours === 0;
   const percentage = monthlyHours > 0 ? Math.min((totalHours / monthlyHours) * 100, 100) : 0;
   const isOverBudget = monthlyHours > 0 ? totalHours > monthlyHours : false;
 
@@ -142,10 +145,9 @@ export function ClientOverview({ records, monthlyHours, typeLabels, onUpdateClie
         <Card className="shadow-md border-slate-100 rounded-xl overflow-hidden bg-slate-50/50">
           <CardContent className="p-6 flex justify-between items-center">
             <div>
-              <h2 className="text-sm font-bold mb-1 text-[#2A2B73] uppercase tracking-wide">Horas Invertidas</h2>
-              <p className="text-xs text-slate-500 font-medium">Contrato sujeto a servicios (sin límite predefinido)</p>
+              <h2 className="text-sm font-bold mb-1 text-[#2A2B73] uppercase tracking-wide">Modalidad del contrato</h2>
+              <p className="text-xs text-slate-500 font-medium">Contrato sujeto a servicios (sin límite de horas predefinido)</p>
             </div>
-            <div className="text-3xl font-black text-[#62BAD3]">{totalHours}h</div>
           </CardContent>
         </Card>
       )}
@@ -160,6 +162,7 @@ export function ClientOverview({ records, monthlyHours, typeLabels, onUpdateClie
                 r={r} 
                 typeLabels={typeLabels} 
                 onUpdateClientNote={onUpdateClientNote} 
+                isServiceOnly={isServiceOnly}
               />
             ))}
             {regularRecords.length === 0 && (

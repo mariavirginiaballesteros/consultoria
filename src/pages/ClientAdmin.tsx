@@ -242,6 +242,7 @@ export default function ClientAdmin() {
   if (!client) return <div className="min-h-screen p-10 text-center font-medium">Cliente no encontrado</div>;
 
   const clientHours = client.monthly_hours ?? MONTHLY_BUDGET;
+  const isServiceOnly = clientHours === 0;
   const clientAreas = client.areas ?? AREAS;
   const typeLabelsMap = clientTypes.reduce((acc: any, t: any) => ({...acc, [t.value]: t.label}), {});
   const opportunities = filteredRecords.filter(r => r.opportunity);
@@ -354,8 +355,8 @@ export default function ClientAdmin() {
         </div>
 
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <AdminForm onAdd={(data) => addRecord.mutate(data)} areas={clientAreas} activityTypes={clientTypes} />
-          <AdminTable records={filteredRecords} onEdit={(record) => setEditingRecord(record)} onDelete={(ids) => bulkDelete.mutate(ids)} typeLabels={typeLabelsMap} />
+          <AdminForm onAdd={(data) => addRecord.mutate(data)} areas={clientAreas} activityTypes={clientTypes} isServiceOnly={isServiceOnly} />
+          <AdminTable records={filteredRecords} onEdit={(record) => setEditingRecord(record)} onDelete={(ids) => bulkDelete.mutate(ids)} typeLabels={typeLabelsMap} isServiceOnly={isServiceOnly} />
           {opportunities.length > 0 && (
             <div className="bg-white border-2 border-[#E32462]/30 rounded-xl p-6 mb-8 shadow-sm relative overflow-hidden">
               <div className="absolute top-0 left-0 w-1.5 h-full bg-[#E32462]"></div>
@@ -364,7 +365,7 @@ export default function ClientAdmin() {
                 {opportunities.map(opp => (
                   <div key={opp.id} className="py-3 border-b border-slate-100 last:border-0 text-sm text-slate-600 flex justify-between items-start gap-4">
                     <div><strong className="block text-[#2A2B73] mb-1 font-bold">{opp.area}</strong>{opp.impact}</div>
-                    {opp.hours > 0 && <span className="shrink-0 flex items-center font-bold text-xs text-[#2A2B73] bg-slate-100 px-2 py-1 rounded"><Clock className="h-3 w-3 mr-1" /> {opp.hours}h estimadas</span>}
+                    {!isServiceOnly && opp.hours > 0 && <span className="shrink-0 flex items-center font-bold text-xs text-[#2A2B73] bg-slate-100 px-2 py-1 rounded"><Clock className="h-3 w-3 mr-1" /> {opp.hours}h estimadas</span>}
                   </div>
                 ))}
               </div>
@@ -372,7 +373,7 @@ export default function ClientAdmin() {
           )}
         </div>
       </div>
-      <EditActivityDialog record={editingRecord} isOpen={!!editingRecord} onClose={() => setEditingRecord(null)} onSave={(data) => updateRecord.mutate(data)} areas={clientAreas} activityTypes={clientTypes} />
+      <EditActivityDialog record={editingRecord} isOpen={!!editingRecord} onClose={() => setEditingRecord(null)} onSave={(data) => updateRecord.mutate(data)} areas={clientAreas} activityTypes={clientTypes} isServiceOnly={isServiceOnly} />
       <JengibreFooter />
     </div>
   );

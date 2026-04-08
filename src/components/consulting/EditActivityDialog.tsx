@@ -14,9 +14,10 @@ interface EditActivityDialogProps {
   onSave: (record: ActivityRecord) => void;
   areas: string[];
   activityTypes: { value: string; label: string }[];
+  isServiceOnly?: boolean;
 }
 
-export function EditActivityDialog({ record, isOpen, onClose, onSave, areas, activityTypes }: EditActivityDialogProps) {
+export function EditActivityDialog({ record, isOpen, onClose, onSave, areas, activityTypes, isServiceOnly }: EditActivityDialogProps) {
   const [formData, setFormData] = useState<ActivityRecord | null>(null);
 
   useEffect(() => {
@@ -36,15 +37,17 @@ export function EditActivityDialog({ record, isOpen, onClose, onSave, areas, act
           </DialogTitle>
         </DialogHeader>
         <div className="grid gap-5 py-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className={`grid ${isServiceOnly ? 'grid-cols-1' : 'grid-cols-2'} gap-4`}>
             <div className="space-y-1.5">
               <Label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Fecha</Label>
               <Input type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="focus-visible:ring-[#62BAD3]" />
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Horas</Label>
-              <Input type="number" step="0.5" min="0.5" value={formData.hours} onChange={e => setFormData({...formData, hours: parseFloat(e.target.value) || 0})} className="focus-visible:ring-[#62BAD3]" />
-            </div>
+            {!isServiceOnly && (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Horas</Label>
+                <Input type="number" step="0.5" min="0.5" value={formData.hours} onChange={e => setFormData({...formData, hours: parseFloat(e.target.value) || 0})} className="focus-visible:ring-[#62BAD3]" />
+              </div>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">

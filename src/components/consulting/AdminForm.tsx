@@ -11,9 +11,10 @@ interface AdminFormProps {
   onAdd: (record: any) => void;
   areas: string[];
   activityTypes: { value: string; label: string }[];
+  isServiceOnly?: boolean;
 }
 
-export function AdminForm({ onAdd, areas, activityTypes }: AdminFormProps) {
+export function AdminForm({ onAdd, areas, activityTypes, isServiceOnly }: AdminFormProps) {
   const getLocalDate = () => {
     const d = new Date();
     d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
@@ -42,7 +43,7 @@ export function AdminForm({ onAdd, areas, activityTypes }: AdminFormProps) {
       date,
       type,
       area,
-      hours: parseFloat(hours) || 0,
+      hours: isServiceOnly ? 0 : (parseFloat(hours) || 0),
       impact,
       notes,
       opportunity
@@ -66,7 +67,7 @@ export function AdminForm({ onAdd, areas, activityTypes }: AdminFormProps) {
         <Zap className="h-5 w-5 text-[#D9E021]" />
         Registrar nueva actividad
       </h2>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+      <div className={`grid grid-cols-1 ${isServiceOnly ? 'md:grid-cols-3' : 'md:grid-cols-4'} gap-4 mb-4`}>
         <div className="space-y-1.5">
           <Label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Fecha</Label>
           <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="focus-visible:ring-[#62BAD3]" />
@@ -83,10 +84,12 @@ export function AdminForm({ onAdd, areas, activityTypes }: AdminFormProps) {
             {areas.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
         </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Horas</Label>
-          <Input type="number" step="0.5" min="0.5" value={hours} onChange={e => setHours(e.target.value)} className="focus-visible:ring-[#62BAD3]" />
-        </div>
+        {!isServiceOnly && (
+          <div className="space-y-1.5">
+            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Horas</Label>
+            <Input type="number" step="0.5" min="0.5" value={hours} onChange={e => setHours(e.target.value)} className="focus-visible:ring-[#62BAD3]" />
+          </div>
+        )}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
         <div className="space-y-1.5">
