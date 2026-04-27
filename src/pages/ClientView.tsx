@@ -6,8 +6,9 @@ import { useAuth } from "@/components/AuthProvider";
 import { MetricsCards } from "@/components/consulting/MetricsCards";
 import { ClientOverview } from "@/components/consulting/ClientOverview";
 import { ActivityRecord, MONTHLY_BUDGET, DEFAULT_TYPES, getPeriodInfo, formatDate } from "@/lib/consulting-data";
-import { Loader2, FileDown, CalendarDays, Clock, FileSignature, LogOut, FileText, Receipt, ExternalLink } from "lucide-react";
+import { Loader2, FileDown, CalendarDays, Clock, FileSignature, LogOut, FileText, Receipt, ExternalLink, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { JengibreFooter } from "@/components/JengibreFooter";
 import { showSuccess, showError } from "@/utils/toast";
@@ -23,13 +24,17 @@ export default function ClientView() {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [selectedPeriodId, setSelectedPeriodId] = useState<string>("");
 
+  const [accessCode, setAccessCode] = useState("");
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+
   const { data: client, isLoading: clientLoading } = useQuery({
     queryKey: ['client', clientId],
     queryFn: async () => {
       const { data, error } = await supabase.from('clients').select('*').eq('id', clientId).single();
       if (error) throw error;
       return data;
-    }
+    },
+    enabled: !!session
   });
 
   const { data: allRecords = [], isLoading: recordsLoading } = useQuery({
@@ -39,7 +44,8 @@ export default function ClientView() {
       if (error) throw error;
       return data as ActivityRecord[];
     },
-    refetchInterval: 5000 
+    refetchInterval: 5000,
+    enabled: !!session
   });
 
   const updateClientNote = useMutation({
@@ -82,15 +88,11 @@ export default function ClientView() {
     if (!element) return;
     
     setIsGeneratingPdf(true);
-    
-    // Set rendering attribute to apply specific print CSS rules
     element.setAttribute("data-rendering", "true");
     
-    // Give DOM time to reflow and apply the print styles (expand containers, hide buttons)
     await new Promise(resolve => setTimeout(resolve, 600));
     
     try {
-      // Usamos windowWidth de 1200 para forzar diseño de computadora aunque estén en un móvil
       const canvas = await html2canvas(element, { 
         scale: 2, 
         useCORS: true, 
@@ -100,9 +102,6 @@ export default function ClientView() {
       });
       
       const imgData = canvas.toDataURL("image/jpeg", 0.95);
-      
-      // Creamos un PDF de UNA SOLA PÁGINA (Página continua). 
-      // Esto previene los cortes horribles a la mitad del texto.
       const pdfWidth = canvas.width / 2; 
       const pdfHeight = canvas.height / 2;
       
@@ -125,8 +124,58 @@ export default function ClientView() {
     }
   };
 
+  const handleLogin = async () => {
+    if (!accessCode.trim()) return;
+    setIsAuthenticating(true);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: `acceso_${clientId}@jengibre.com`,
+      password: accessCode.trim()
+    });
+    setIsAuthenticating(false);
+    if (error) {
+      showError("El código de acceso es incorrecto");
+    } else {
+      showSuccess("Acceso autorizado");
+    }
+  };
+
+  if (!session) {
+    return (
+      <div className="min-h-screen bg-[#F4F5F8] flex items-center justify-center p-4 selection:bg-[#62BAD3]/30">
+        <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 md:p-10 border border-slate-100 flex flex-col items-center text-center relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-2 bg-[#D9E021]"></div>
+          
+          <img src={logoUrl} alt="Logo" className="h-24 w-24 rounded-2xl shadow-md object-cover border-4 border-[#D9E021] mb-6" />
+          
+          <h1 className="text-2xl font-black text-[#2A2B73] mb-2 flex items-center gap-2">
+            <Lock className="h-5 w-5 text-[#E32462]" /> Acceso Protegido
+          </h1>
+          <p className="text-slate-500 text-sm mb-8 font-medium">Ingresa el código de acceso proporcionado por tu consultor para visualizar tu reporte.</p>
+          
+          <div className="w-full space-y-4">
+            <Input 
+              type="password" 
+              value={accessCode}
+              onChange={(e) => setAccessCode(e.target.value)}
+              placeholder="Ej: JengiMacro.1" 
+              className="h-14 text-center text-lg md:text-xl font-bold tracking-widest bg-slate-50 border-slate-200 focus-visible:ring-[#E32462] rounded-xl"
+              onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+            />
+            <Button 
+              onClick={handleLogin} 
+              disabled={isAuthenticating || !accessCode.trim()} 
+              className="w-full h-14 bg-[#2A2B73] hover:bg-[#1f2055] text-white font-bold text-lg rounded-xl shadow-md transition-transform active:scale-[0.98]"
+            >
+              {isAuthenticating ? <Loader2 className="h-6 w-6 animate-spin" /> : "Acceder al Reporte"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (clientLoading || recordsLoading) return <div className="min-h-screen flex items-center justify-center bg-[#F4F5F8]"><Loader2 className="h-10 w-10 animate-spin text-[#D9E021]" /></div>;
-  if (!client) return <div className="min-h-screen p-10 text-center text-slate-600 font-medium">El reporte de esta empresa no está disponible o el enlace es incorrecto.</div>;
+  if (!client) return <div className="min-h-screen p-10 text-center text-slate-600 font-medium">El reporte de esta empresa no está disponible o no tienes permisos para visualizarlo.</div>;
 
   const clientHours = client.monthly_hours ?? MONTHLY_BUDGET;
   const isServiceOnly = clientHours === 0;
@@ -141,7 +190,7 @@ export default function ClientView() {
       {session && (
         <div className="absolute top-4 right-4 z-50">
           <Button variant="outline" onClick={logout} className="bg-white/80 backdrop-blur-md text-slate-700 shadow-sm border-slate-200 hover:bg-white font-bold" data-html2canvas-ignore>
-            <LogOut className="h-4 w-4 mr-2" /> Modo Admin (Salir)
+            <LogOut className="h-4 w-4 mr-2" /> Cerrar Sesión
           </Button>
         </div>
       )}

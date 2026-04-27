@@ -28,7 +28,7 @@ serve(async (req) => {
     const { data: profile } = await supabaseClient.from('profiles').select('role').eq('id', user.id).single()
     if (profile?.role !== 'admin') throw new Error('No tienes permisos de administrador')
 
-    // Usar rol de servicio para crear al usuario sin confirmación de email
+    // Usar rol de servicio para crear o actualizar al usuario
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -36,21 +36,34 @@ serve(async (req) => {
 
     const { email, password, clientId } = await req.json()
 
-    // 1. Crear usuario en Auth (saltando validación)
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true 
-    })
+    // Verificar si ya existe un perfil vinculado a este cliente
+    const { data: existingProfile } = await supabaseAdmin.from('profiles')
+      .select('id')
+      .eq('client_id', clientId)
+      .single()
 
-    if (authError) throw new Error(authError.message)
+    if (existingProfile) {
+      // El usuario ya existe, solo actualizamos su contraseña (código de acceso)
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+        existingProfile.id,
+        { password: password }
+      )
+      if (updateError) throw new Error(updateError.message)
+    } else {
+      // 1. Crear usuario en Auth nuevo
+      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true 
+      })
+      if (authError) throw new Error(authError.message)
 
-    // 2. Vincular el perfil creado por el trigger con el ID del cliente
-    const { error: profileError } = await supabaseAdmin.from('profiles')
-      .update({ client_id: clientId, role: 'client' })
-      .eq('id', authData.user.id)
-
-    if (profileError) throw new Error(profileError.message)
+      // 2. Vincular el perfil creado por el trigger con el ID del cliente
+      const { error: profileError } = await supabaseAdmin.from('profiles')
+        .update({ client_id: clientId, role: 'client' })
+        .eq('id', authData.user.id)
+      if (profileError) throw new Error(profileError.message)
+    }
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

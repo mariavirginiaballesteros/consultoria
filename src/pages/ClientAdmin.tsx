@@ -3,7 +3,7 @@ import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/components/AuthProvider";
-import { ArrowLeft, Copy, Download, Upload, Settings, CalendarDays, Clock, ExternalLink, FileSignature, LogOut, FileText, Receipt, Trash2, Loader2, UploadCloud } from "lucide-react";
+import { ArrowLeft, Copy, Download, Upload, Settings, CalendarDays, Clock, ExternalLink, FileSignature, LogOut, FileText, Receipt, Trash2, Loader2, UploadCloud, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { MetricsCards } from "@/components/consulting/MetricsCards";
@@ -262,19 +262,18 @@ export default function ClientAdmin() {
                 <h1 className="text-2xl font-black text-white leading-tight truncate max-w-[200px] sm:max-w-full">{client.name}</h1>
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-xs font-bold text-[#D9E021] flex items-center gap-1"><Settings className="h-3 w-3" /> Admin</span>
+                  {client.access_code && (
+                    <>
+                      <span className="text-white/40 text-xs">•</span>
+                      <span className="text-[10px] font-bold text-white bg-white/20 px-2 py-0.5 rounded-md border border-white/10 flex items-center gap-1">
+                        <Lock className="h-3 w-3" /> Clave: {client.access_code}
+                      </span>
+                    </>
+                  )}
                   <span className="text-white/40 text-xs">•</span>
                   <span className="text-xs font-medium text-white/80 flex items-center flex-wrap gap-1">
                     <FileSignature className="h-3 w-3 text-[#62BAD3]" /> Contrato: 
                     {clientHours > 0 ? <strong className="text-white ml-1">{clientHours}h/mes</strong> : <strong className="text-white ml-1">Por Servicios</strong>}
-                    {client.services && client.services.length > 0 && (
-                      <>
-                        <span className="text-white/40 mx-1">•</span>
-                        <span className="text-[#2A2B73] bg-[#D9E021] px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider">
-                          {client.services.join(', ')}
-                        </span>
-                      </>
-                    )}
-                    {client.contract_start_date && client.contract_duration_months && <span className="text-white/60 ml-1"> ({client.contract_duration_months} meses)</span>}
                   </span>
                 </div>
               </div>
