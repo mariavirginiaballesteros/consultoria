@@ -52,9 +52,13 @@ export default function Index() {
       if (error) throw error;
       
       if (clientData.access_code) {
-        await supabase.functions.invoke('create-client-user', {
+        const res = await supabase.functions.invoke('create-client-user', {
           body: { email: `acceso_${data.id}@jengibre.com`, password: clientData.access_code, clientId: data.id }
         });
+        if (res.error || res.data?.error) {
+          console.error("Error al asignar clave:", res.error || res.data?.error);
+          throw new Error("El cliente se creó, pero la clave falló: " + (res.data?.error || "Error de servidor"));
+        }
       }
       return data;
     },
@@ -65,7 +69,7 @@ export default function Index() {
       showSuccess("Cliente creado con éxito");
       navigate(`/admin/${data.id}`);
     },
-    onError: (err) => showError("Error al crear cliente")
+    onError: (err: any) => showError(err.message || "Error al crear cliente")
   });
 
   const updateClient = useMutation({
@@ -74,9 +78,13 @@ export default function Index() {
       if (error) throw error;
       
       if (clientData.access_code) {
-        await supabase.functions.invoke('create-client-user', {
+        const res = await supabase.functions.invoke('create-client-user', {
           body: { email: `acceso_${data.id}@jengibre.com`, password: clientData.access_code, clientId: data.id }
         });
+        if (res.error || res.data?.error) {
+          console.error("Error al actualizar clave:", res.error || res.data?.error);
+          throw new Error("Datos guardados, pero falló la clave: " + (res.data?.error || "Error de servidor"));
+        }
       }
       return data;
     },
@@ -86,7 +94,7 @@ export default function Index() {
       resetForm();
       showSuccess("Cliente actualizado con éxito");
     },
-    onError: (err) => showError("Error al actualizar cliente")
+    onError: (err: any) => showError(err.message || "Error al actualizar cliente")
   });
 
   const deleteClient = useMutation({
@@ -166,11 +174,11 @@ export default function Index() {
     const url = `${window.location.origin}/client/${clientId}`;
     try {
       await navigator.clipboard.writeText(url);
-      showSuccess("Enlace copiado al portapapeles");
+      showSuccess("Enlace de acceso directo copiado al portapapeles");
     } catch (err) {
       const textArea = document.createElement("textarea");
       textArea.value = url; document.body.appendChild(textArea); textArea.select();
-      try { document.execCommand('copy'); showSuccess("Enlace copiado"); } catch (e) { showError("No se pudo copiar."); }
+      try { document.execCommand('copy'); showSuccess("Enlace copiado al portapapeles"); } catch (e) { showError("No se pudo copiar el enlace."); }
       document.body.removeChild(textArea);
     }
   };
@@ -206,7 +214,7 @@ export default function Index() {
                 <DatabaseZap className="h-6 w-6 text-[#E32462] shrink-0" />
                 <div>
                   <h3 className="font-bold text-[#2A2B73] mb-1">Error de Base de Datos</h3>
-                  <p className="text-sm text-slate-700">Asegúrate de haber creado las columnas "access_code" y "contract_type" en Supabase.</p>
+                  <p className="text-sm text-slate-700">Asegúrate de haber creado la columna "access_code" como te indicó Dyad.</p>
                 </div>
               </div>
             </CardContent>
@@ -220,7 +228,7 @@ export default function Index() {
           </Button>
 
           <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
-            <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto">
+            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle className="text-2xl font-black text-[#2A2B73]">{editingClient ? "Editar Cliente" : "Configurar Cliente"}</DialogTitle></DialogHeader>
               <div className="space-y-6 py-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -324,7 +332,7 @@ export default function Index() {
                       </span>
                     </div>
                     <div className="flex items-center flex-wrap gap-2 w-full md:w-auto">
-                      <Button variant="outline" size="sm" onClick={() => copyLink(client.id)} className="flex-1 md:flex-none border-slate-200 hover:bg-[#62BAD3]/10 hover:text-[#62BAD3] font-bold" title="Copiar enlace"><Copy className="h-4 w-4 mr-2" /> Copiar Link</Button>
+                      <Button variant="outline" size="sm" onClick={() => copyLink(client.id)} className="flex-1 md:flex-none border-slate-200 hover:bg-[#62BAD3]/10 hover:text-[#62BAD3] font-bold" title="Copiar enlace"><Copy className="h-4 w-4 mr-2" /> Copiar Link Público</Button>
                       <Button onClick={() => navigate(`/admin/${client.id}`)} size="sm" className="flex-1 md:flex-none bg-[#2A2B73] text-white hover:bg-[#1f2055] font-bold">Gestionar <ArrowRight className="h-4 w-4 ml-2" /></Button>
                       <div className="flex border-l border-slate-200 pl-2 ml-1 w-full md:w-auto mt-2 md:mt-0 justify-end">
                         <Button variant="ghost" size="sm" onClick={() => handleOpenEdit(client)} className="text-slate-400 hover:text-[#2A2B73] hover:bg-slate-100 px-2"><Pencil className="h-4 w-4" /></Button>
