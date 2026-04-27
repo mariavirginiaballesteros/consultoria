@@ -12,6 +12,8 @@ interface ClientOverviewProps {
   monthlyHours: number;
   typeLabels: Record<string, string>;
   onUpdateClientNote: (id: string, note: string) => void;
+  contractType: string;
+  totalAccumulatedHours: number;
 }
 
 function ActivityCard({ r, typeLabels, onUpdateClientNote, isServiceOnly }: { r: ActivityRecord; typeLabels: Record<string, string>; onUpdateClientNote: (id: string, note: string) => void; isServiceOnly: boolean }) {
@@ -117,23 +119,31 @@ function ActivityCard({ r, typeLabels, onUpdateClientNote, isServiceOnly }: { r:
   );
 }
 
-export function ClientOverview({ records, monthlyHours, typeLabels, onUpdateClientNote }: ClientOverviewProps) {
+export function ClientOverview({ records, monthlyHours, typeLabels, onUpdateClientNote, contractType, totalAccumulatedHours }: ClientOverviewProps) {
   const regularRecords = records.filter(r => !r.opportunity);
-  const totalHours = regularRecords.reduce((sum, r) => sum + r.hours, 0);
   
-  const isServiceOnly = monthlyHours === 0;
-  const percentage = monthlyHours > 0 ? Math.min((totalHours / monthlyHours) * 100, 100) : 0;
-  const isOverBudget = monthlyHours > 0 ? totalHours > monthlyHours : false;
+  const isTotal = contractType === 'total';
+  const isServiceOnly = contractType === 'service';
+  
+  const periodHours = regularRecords.reduce((sum, r) => sum + r.hours, 0);
+  
+  const displayHours = isTotal ? totalAccumulatedHours : periodHours;
+  const limitHours = monthlyHours; 
+  
+  const percentage = limitHours > 0 ? Math.min((displayHours / limitHours) * 100, 100) : 0;
+  const isOverBudget = limitHours > 0 ? displayHours > limitHours : false;
+  
+  const titleText = isTotal ? "Consumo de la Bolsa de Horas" : "Consumo mensual del periodo";
 
   return (
     <div className="space-y-6">
-      {monthlyHours > 0 ? (
+      {!isServiceOnly ? (
         <Card className="shadow-md border-slate-100 rounded-xl overflow-hidden">
           <CardContent className="p-6">
-            <h2 className="text-sm font-bold mb-3 text-[#2A2B73] uppercase tracking-wide">Consumo mensual</h2>
+            <h2 className="text-sm font-bold mb-3 text-[#2A2B73] uppercase tracking-wide">{titleText}</h2>
             <div className="flex justify-between text-sm mb-3">
               <span className="text-slate-500 font-medium">Progreso</span>
-              <span className="font-bold text-[#2A2B73]">{totalHours}/{monthlyHours}h ({Math.round(percentage)}%)</span>
+              <span className="font-bold text-[#2A2B73]">{displayHours} / {limitHours}h ({Math.round(percentage)}%)</span>
             </div>
             <Progress 
               value={percentage} 

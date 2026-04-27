@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Plus, ArrowRight, Trash2, Copy, DatabaseZap, X, Pencil, LogOut, Lock } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
 import { JengibreFooter } from "@/components/JengibreFooter";
@@ -24,6 +25,7 @@ export default function Index() {
   
   const [name, setName] = useState("");
   const [accessCode, setAccessCode] = useState("");
+  const [contractType, setContractType] = useState<string>("monthly");
   const [monthlyHours, setMonthlyHours] = useState(20);
   const [periodStartDay, setPeriodStartDay] = useState(1);
   const [contractStartDate, setContractStartDate] = useState("");
@@ -102,6 +104,7 @@ export default function Index() {
     setEditingClient(null);
     setName("");
     setAccessCode("");
+    setContractType("monthly");
     setMonthlyHours(20);
     setPeriodStartDay(1);
     setContractStartDate("");
@@ -120,6 +123,7 @@ export default function Index() {
     setEditingClient(client);
     setName(client.name);
     setAccessCode(client.access_code || "");
+    setContractType(client.contract_type || (client.monthly_hours === 0 ? 'service' : 'monthly'));
     setMonthlyHours(client.monthly_hours ?? 20);
     setPeriodStartDay(client.period_start_day || 1);
     setContractStartDate(client.contract_start_date || "");
@@ -137,7 +141,8 @@ export default function Index() {
     const payload = {
       name: name.trim(),
       access_code: accessCode.trim(),
-      monthly_hours: monthlyHours,
+      contract_type: contractType,
+      monthly_hours: contractType === 'service' ? 0 : monthlyHours,
       period_start_day: periodStartDay,
       contract_start_date: contractStartDate || null,
       contract_duration_months: contractDuration ? parseInt(contractDuration) : null,
@@ -161,11 +166,11 @@ export default function Index() {
     const url = `${window.location.origin}/client/${clientId}`;
     try {
       await navigator.clipboard.writeText(url);
-      showSuccess("Enlace de acceso directo copiado al portapapeles");
+      showSuccess("Enlace copiado al portapapeles");
     } catch (err) {
       const textArea = document.createElement("textarea");
       textArea.value = url; document.body.appendChild(textArea); textArea.select();
-      try { document.execCommand('copy'); showSuccess("Enlace copiado al portapapeles"); } catch (e) { showError("No se pudo copiar el enlace."); }
+      try { document.execCommand('copy'); showSuccess("Enlace copiado"); } catch (e) { showError("No se pudo copiar."); }
       document.body.removeChild(textArea);
     }
   };
@@ -201,7 +206,7 @@ export default function Index() {
                 <DatabaseZap className="h-6 w-6 text-[#E32462] shrink-0" />
                 <div>
                   <h3 className="font-bold text-[#2A2B73] mb-1">Error de Base de Datos</h3>
-                  <p className="text-sm text-slate-700">Asegúrate de haber creado la columna "access_code" como te indicó Dyad.</p>
+                  <p className="text-sm text-slate-700">Asegúrate de haber creado las columnas "access_code" y "contract_type" en Supabase.</p>
                 </div>
               </div>
             </CardContent>
@@ -215,7 +220,7 @@ export default function Index() {
           </Button>
 
           <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
-            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+            <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle className="text-2xl font-black text-[#2A2B73]">{editingClient ? "Editar Cliente" : "Configurar Cliente"}</DialogTitle></DialogHeader>
               <div className="space-y-6 py-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -228,14 +233,38 @@ export default function Index() {
                     <Input value={accessCode} onChange={e => setAccessCode(e.target.value)} placeholder="Ej: JengiMacro.1" className="h-12 text-base font-mono border-[#E32462]/40 focus-visible:ring-[#E32462]" />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="font-bold text-slate-600">Horas mensuales</Label>
-                    <Input type="number" min="0" value={monthlyHours} onChange={e => setMonthlyHours(Number(e.target.value))} className="h-12 text-base" />
-                    <span className="text-[10px] text-slate-500">Pon 0 si el contrato es por servicios</span>
-                  </div>
-                  <div className="space-y-2"><Label className="font-bold text-slate-600">Día de inicio de ciclo</Label><Input type="number" min="1" max="28" value={periodStartDay} onChange={e => setPeriodStartDay(Number(e.target.value))} className="h-12 text-base" /></div>
+
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <Label className="font-bold text-[#2A2B73] mb-4 block">Modalidad del Contrato</Label>
+                  <RadioGroup value={contractType} onValueChange={setContractType} className="flex flex-col sm:flex-row gap-4">
+                    <div className="flex items-center space-x-2 bg-white px-3 py-2 border border-slate-200 rounded-lg flex-1">
+                      <RadioGroupItem value="monthly" id="monthly" className="text-[#62BAD3] border-slate-300" />
+                      <Label htmlFor="monthly" className="cursor-pointer font-bold text-xs">Abono Mensual</Label>
+                    </div>
+                    <div className="flex items-center space-x-2 bg-white px-3 py-2 border border-slate-200 rounded-lg flex-1">
+                      <RadioGroupItem value="total" id="total" className="text-[#62BAD3] border-slate-300" />
+                      <Label htmlFor="total" className="cursor-pointer font-bold text-xs">Bolsa (Total)</Label>
+                    </div>
+                    <div className="flex items-center space-x-2 bg-white px-3 py-2 border border-slate-200 rounded-lg flex-1">
+                      <RadioGroupItem value="service" id="service" className="text-[#62BAD3] border-slate-300" />
+                      <Label htmlFor="service" className="cursor-pointer font-bold text-xs">Por Servicios</Label>
+                    </div>
+                  </RadioGroup>
                 </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  {contractType !== 'service' && (
+                    <div className="space-y-2">
+                      <Label className="font-bold text-slate-600">{contractType === 'total' ? 'Total de horas contratadas' : 'Horas por mes'}</Label>
+                      <Input type="number" min="1" value={monthlyHours} onChange={e => setMonthlyHours(Number(e.target.value))} className="h-12 text-base" />
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <Label className="font-bold text-slate-600">Día de inicio de ciclo</Label>
+                    <Input type="number" min="1" max="28" value={periodStartDay} onChange={e => setPeriodStartDay(Number(e.target.value))} className="h-12 text-base" />
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2"><Label className="font-bold text-slate-600">Inicio del contrato <span className="text-slate-400 font-normal">(Opcional)</span></Label><Input type="date" value={contractStartDate} onChange={e => setContractStartDate(e.target.value)} className="h-12 text-base" /></div>
                   <div className="space-y-2"><Label className="font-bold text-slate-600">Duración (meses) <span className="text-slate-400 font-normal">(Opcional)</span></Label><Input type="number" min="1" value={contractDuration} onChange={e => setContractDuration(e.target.value)} placeholder="Ej: 3" className="h-12 text-base" /></div>
@@ -272,36 +301,40 @@ export default function Index() {
            <div className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-slate-200 text-slate-500 font-medium">No tienes clientes todavía.</div>
         ) : (
           <div className="grid gap-4">
-            {clients.map(client => (
-              <Card key={client.id} className="shadow-sm hover:shadow-md transition-all border-slate-200 rounded-xl">
-                <CardContent className="p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                  <div className="flex flex-col">
-                    <span className="font-bold text-lg text-[#2A2B73] flex items-center gap-2">
-                      {client.name} 
-                      {!client.access_code && <span className="text-[10px] bg-[#E32462] text-white px-2 py-0.5 rounded-full uppercase tracking-wider">Falta Código</span>}
-                    </span>
-                    <span className="text-xs text-slate-500 font-medium flex items-center flex-wrap gap-1 mt-1">
-                      {client.monthly_hours > 0 ? `${client.monthly_hours}h mensuales` : 'Contrato por servicios'}
-                      {client.services?.length > 0 && ` • ${client.services.length} servicios definidos`}
-                      {client.access_code && (
-                        <>
-                          <span className="mx-1 text-slate-300">•</span>
-                          <span className="text-[#E32462] font-bold flex items-center gap-1"><Lock className="h-3 w-3" /> Acceso: {client.access_code}</span>
-                        </>
-                      )}
-                    </span>
-                  </div>
-                  <div className="flex items-center flex-wrap gap-2 w-full md:w-auto">
-                    <Button variant="outline" size="sm" onClick={() => copyLink(client.id)} className="flex-1 md:flex-none border-slate-200 hover:bg-[#62BAD3]/10 hover:text-[#62BAD3] font-bold" title="Copiar enlace"><Copy className="h-4 w-4 mr-2" /> Copiar Link Público</Button>
-                    <Button onClick={() => navigate(`/admin/${client.id}`)} size="sm" className="flex-1 md:flex-none bg-[#2A2B73] text-white hover:bg-[#1f2055] font-bold">Gestionar <ArrowRight className="h-4 w-4 ml-2" /></Button>
-                    <div className="flex border-l border-slate-200 pl-2 ml-1 w-full md:w-auto mt-2 md:mt-0 justify-end">
-                      <Button variant="ghost" size="sm" onClick={() => handleOpenEdit(client)} className="text-slate-400 hover:text-[#2A2B73] hover:bg-slate-100 px-2"><Pencil className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="sm" onClick={() => { if(window.confirm('¿Borrar este cliente de forma irreversible?')) deleteClient.mutate(client.id); }} className="text-slate-400 hover:text-[#E32462] hover:bg-[#E32462]/10 px-2"><Trash2 className="h-4 w-4" /></Button>
+            {clients.map(client => {
+              const typeLabel = client.contract_type === 'total' ? 'Bolsa de Horas' : client.contract_type === 'service' || client.monthly_hours === 0 ? 'Por Servicios' : 'Abono Mensual';
+              return (
+                <Card key={client.id} className="shadow-sm hover:shadow-md transition-all border-slate-200 rounded-xl">
+                  <CardContent className="p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div className="flex flex-col">
+                      <span className="font-bold text-lg text-[#2A2B73] flex items-center gap-2">
+                        {client.name} 
+                        {!client.access_code && <span className="text-[10px] bg-[#E32462] text-white px-2 py-0.5 rounded-full uppercase tracking-wider">Falta Código</span>}
+                      </span>
+                      <span className="text-xs text-slate-500 font-medium flex items-center flex-wrap gap-1 mt-1">
+                        <span className="bg-slate-100 px-2 py-0.5 rounded font-bold text-slate-600">{typeLabel}</span>
+                        {client.contract_type !== 'service' && client.monthly_hours > 0 && ` • ${client.monthly_hours}h`}
+                        {client.services?.length > 0 && ` • ${client.services.length} servicios definidos`}
+                        {client.access_code && (
+                          <>
+                            <span className="mx-1 text-slate-300">•</span>
+                            <span className="text-[#E32462] font-bold flex items-center gap-1"><Lock className="h-3 w-3" /> Acceso: {client.access_code}</span>
+                          </>
+                        )}
+                      </span>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    <div className="flex items-center flex-wrap gap-2 w-full md:w-auto">
+                      <Button variant="outline" size="sm" onClick={() => copyLink(client.id)} className="flex-1 md:flex-none border-slate-200 hover:bg-[#62BAD3]/10 hover:text-[#62BAD3] font-bold" title="Copiar enlace"><Copy className="h-4 w-4 mr-2" /> Copiar Link</Button>
+                      <Button onClick={() => navigate(`/admin/${client.id}`)} size="sm" className="flex-1 md:flex-none bg-[#2A2B73] text-white hover:bg-[#1f2055] font-bold">Gestionar <ArrowRight className="h-4 w-4 ml-2" /></Button>
+                      <div className="flex border-l border-slate-200 pl-2 ml-1 w-full md:w-auto mt-2 md:mt-0 justify-end">
+                        <Button variant="ghost" size="sm" onClick={() => handleOpenEdit(client)} className="text-slate-400 hover:text-[#2A2B73] hover:bg-slate-100 px-2"><Pencil className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="sm" onClick={() => { if(window.confirm('¿Borrar este cliente de forma irreversible?')) deleteClient.mutate(client.id); }} className="text-slate-400 hover:text-[#E32462] hover:bg-[#E32462]/10 px-2"><Trash2 className="h-4 w-4" /></Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>

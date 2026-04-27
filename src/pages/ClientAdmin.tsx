@@ -242,7 +242,10 @@ export default function ClientAdmin() {
   if (!client) return <div className="min-h-screen p-10 text-center font-medium">Cliente no encontrado</div>;
 
   const clientHours = client.monthly_hours ?? MONTHLY_BUDGET;
-  const isServiceOnly = clientHours === 0;
+  const contractType = client.contract_type || (clientHours === 0 ? 'service' : 'monthly');
+  const isServiceOnly = contractType === 'service';
+  const totalAccumulatedHours = allRecords.filter(r => !r.opportunity).reduce((sum, r) => sum + r.hours, 0);
+
   const clientAreas = client.areas ?? AREAS;
   const typeLabelsMap = clientTypes.reduce((acc: any, t: any) => ({...acc, [t.value]: t.label}), {});
   const opportunities = filteredRecords.filter(r => r.opportunity);
@@ -272,8 +275,10 @@ export default function ClientAdmin() {
                   )}
                   <span className="text-white/40 text-xs">•</span>
                   <span className="text-xs font-medium text-white/80 flex items-center flex-wrap gap-1">
-                    <FileSignature className="h-3 w-3 text-[#62BAD3]" /> Contrato: 
-                    {clientHours > 0 ? <strong className="text-white ml-1">{clientHours}h/mes</strong> : <strong className="text-white ml-1">Por Servicios</strong>}
+                    <FileSignature className="h-3 w-3 text-[#62BAD3]" /> Modalidad: 
+                    {contractType === 'monthly' ? <strong className="text-white ml-1">{clientHours}h mensuales</strong> : 
+                     contractType === 'total' ? <strong className="text-white ml-1">Bolsa total de {clientHours}h</strong> : 
+                     <strong className="text-white ml-1">Por Servicios</strong>}
                   </span>
                 </div>
               </div>
@@ -294,7 +299,13 @@ export default function ClientAdmin() {
           </div>
         </header>
 
-        <MetricsCards records={filteredRecords} isClientView={false} monthlyHours={clientHours} />
+        <MetricsCards 
+          records={filteredRecords} 
+          isClientView={false} 
+          monthlyHours={clientHours} 
+          contractType={contractType} 
+          totalAccumulatedHours={totalAccumulatedHours} 
+        />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
           <Card className="shadow-sm border-slate-100 rounded-xl overflow-hidden">

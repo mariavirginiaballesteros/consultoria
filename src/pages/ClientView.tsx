@@ -178,7 +178,10 @@ export default function ClientView() {
   if (!client) return <div className="min-h-screen p-10 text-center text-slate-600 font-medium">El reporte de esta empresa no está disponible o no tienes permisos para visualizarlo.</div>;
 
   const clientHours = client.monthly_hours ?? MONTHLY_BUDGET;
-  const isServiceOnly = clientHours === 0;
+  const contractType = client.contract_type || (clientHours === 0 ? 'service' : 'monthly');
+  const isServiceOnly = contractType === 'service';
+  const totalAccumulatedHours = allRecords.filter(r => !r.opportunity).reduce((sum, r) => sum + r.hours, 0);
+
   const clientTypes = client.activity_types ?? DEFAULT_TYPES;
   const typeLabelsMap = clientTypes.reduce((acc: any, t: any) => ({...acc, [t.value]: t.label}), {});
   const currentPeriodLabel = uniquePeriods.find(p => p.id === selectedPeriodId)?.label || '';
@@ -213,8 +216,10 @@ export default function ClientView() {
               
               <div className="flex flex-wrap items-center gap-3 mt-2">
                 <span className="flex flex-wrap items-center text-sm font-medium text-white bg-white/10 px-3 py-1.5 rounded-lg border border-white/5">
-                  <FileSignature className="h-4 w-4 mr-2 text-[#62BAD3]" /> Contrato: 
-                  {!isServiceOnly ? <strong className="ml-1 text-white">{clientHours}h mensuales</strong> : <strong className="ml-1 text-white">Por Servicios</strong>}
+                  <FileSignature className="h-4 w-4 mr-2 text-[#62BAD3]" /> Modalidad: 
+                  {contractType === 'monthly' ? <strong className="text-white ml-1">{clientHours}h mensuales</strong> : 
+                   contractType === 'total' ? <strong className="text-white ml-1">Bolsa total de {clientHours}h</strong> : 
+                   <strong className="text-white ml-1">Por Servicios</strong>}
                   
                   {client.services && client.services.length > 0 && (
                     <>
@@ -310,10 +315,23 @@ export default function ClientView() {
           </div>
         )}
 
-        <MetricsCards records={filteredRecords} isClientView={true} monthlyHours={clientHours} />
+        <MetricsCards 
+          records={filteredRecords} 
+          isClientView={true} 
+          monthlyHours={clientHours} 
+          contractType={contractType} 
+          totalAccumulatedHours={totalAccumulatedHours} 
+        />
 
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <ClientOverview records={filteredRecords} monthlyHours={clientHours} typeLabels={typeLabelsMap} onUpdateClientNote={(id, note) => updateClientNote.mutate({ id, client_notes: note })} />
+          <ClientOverview 
+            records={filteredRecords} 
+            monthlyHours={clientHours} 
+            typeLabels={typeLabelsMap} 
+            onUpdateClientNote={(id, note) => updateClientNote.mutate({ id, client_notes: note })} 
+            contractType={contractType} 
+            totalAccumulatedHours={totalAccumulatedHours} 
+          />
           
           {opportunities.length > 0 && (
             <div className="bg-white border-2 border-[#E32462]/30 rounded-xl p-6 mt-8 shadow-sm relative overflow-hidden">
